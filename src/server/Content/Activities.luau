@@ -23,6 +23,15 @@ return {
 		rewards = { coins = 8, firstBonus = 17, bond = "activity" },
 		rewardCooldown = 20,
 	},
+	frisbee = {
+		id = "frisbee",
+		name = "Frisbee Catch",
+		location = "frisbee_field",
+		goal = 3, -- mid-air catches for one completion
+		requires = { { type = "hasPet" } },
+		rewards = { coins = 8, firstBonus = 17, bond = "activity" }, -- same as fetch
+		rewardCooldown = 20,
+	},
 	agility = {
 		id = "agility",
 		name = "Agility Course",

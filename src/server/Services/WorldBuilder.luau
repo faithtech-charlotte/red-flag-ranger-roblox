@@ -495,6 +495,58 @@ local function buildAgility(parent: Instance)
 	end
 end
 
+-- Frisbee Field, east of the Training Grounds. Players throw from the line
+-- at the west end toward +X. Markings don't collide or block raycasts, so
+-- the disc flies over them; only real obstacles (trees, buildings) stop it.
+local function buildFrisbeeField(parent: Instance)
+	local p = Places.get("frisbee_field") :: Places.Place
+	local m = folder("FrisbeeField", parent)
+	local hx, hz = p.size.X / 2, p.size.Z / 2
+	local x0, x1, z0, z1 = p.center.X - hx, p.center.X + hx, p.center.Z - hz, p.center.Z + hz
+	local mark = { CanCollide = false, CanQuery = false, CanTouch = false, CastShadow = false }
+	block(m, "Lawn", Vector3.new(p.size.X, 0.2, p.size.Z), p.center.X, 0, p.center.Z, C.grassLight, { Material = Enum.Material.Grass })
+	-- Mowing stripes
+	for i = 0, math.floor(p.size.X / 8) - 1, 2 do
+		block(m, "Stripe", Vector3.new(8, 0.21, p.size.Z), x0 + 4 + i * 8, 0, p.center.Z, C.grass, { Material = Enum.Material.Grass, CanCollide = false, CanQuery = false, CanTouch = false })
+	end
+	local lineX = x0 + 6
+	block(m, "ThrowLine", Vector3.new(0.6, 0.24, p.size.Z - 6), lineX, 0, p.center.Z, C.white, mark)
+	-- Distance markers every 20 studs: cones at both sidelines and a number.
+	for i, d in { 20, 40, 60 } do
+		local x = lineX + d
+		block(m, "DistanceLine", Vector3.new(0.4, 0.23, p.size.Z - 6), x, 0, p.center.Z, C.white, { CanCollide = false, CanQuery = false, CanTouch = false, CastShadow = false, Transparency = 0.5 })
+		for _, z in { z0 + 2, z1 - 2 } do
+			block(m, "Cone", Vector3.new(1, 1.4, 1), x, 0, z, C.orange, mark)
+		end
+		sign(m, `{d}`, CFrame.new(x, 2.6, z1 - 2) * CFrame.Angles(0, math.rad(180), 0), Vector2.new(2.4, 1.4), ({ C.yellow, C.orange, C.red })[i])
+	end
+	for _, corner in { Vector3.new(x0, 0, z0), Vector3.new(x0, 0, z1), Vector3.new(x1, 0, z0), Vector3.new(x1, 0, z1) } do
+		block(m, "FlagPole", Vector3.new(0.3, 5, 0.3), corner.X, 0, corner.Z, C.white)
+		block(m, "Flag", Vector3.new(0.1, 1.2, 1.8), corner.X, 3.7, corner.Z + 0.9, C.pink, { CanCollide = false })
+	end
+	sign(m, "🥏 Frisbee Field", CFrame.new(x0 - 2, 7, p.center.Z + 10) * CFrame.Angles(0, math.rad(90), 0), Vector2.new(13, 2.6), C.pink)
+	block(m, "SignPost", Vector3.new(0.5, 6, 0.5), x0 - 2, 0, p.center.Z + 10, C.wood)
+
+	-- The frisbee stack: "Grab a frisbee" starts the game.
+	local tx, tz = x0 + 3, p.center.Z - 8
+	block(m, "FrisbeeTable", Vector3.new(3, 2.4, 3), tx, 0, tz, C.wood)
+	local colors = { C.pink, C.yellow, C.blue, C.green }
+	for i, color in colors do
+		part(m, {
+			Name = "StackedFrisbee",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.25, 2, 2),
+			CFrame = CFrame.new(tx, 2.53 + (i - 1) * 0.26, tz) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = color,
+			CanCollide = false,
+		})
+	end
+	local station = block(m, "FrisbeeStation", Vector3.new(3.2, 3.6, 3.2), tx, 0, tz, C.white, { Transparency = 1, CanCollide = false })
+	CollectionService:AddTag(station, "FrisbeeStation")
+	sign(m, "🥏 Grab a frisbee!", CFrame.new(tx, 5.2, tz) * CFrame.Angles(0, math.rad(90), 0), Vector2.new(5, 1.1), C.pink)
+	bench(m, x0 + 3, p.center.Z + 6, 90)
+end
+
 local function buildPaths(parent: Instance)
 	local m = folder("Paths", parent)
 	block(m, "Avenue", Vector3.new(10, 0.15, 124), 0, 0, -28, C.path)
@@ -594,6 +646,7 @@ function World.init(_services)
 	buildDogPark(root, rng)
 	buildSalon(root)
 	buildAgility(root)
+	buildFrisbeeField(root)
 	scatter(root, rng)
 	root.Parent = workspace
 end

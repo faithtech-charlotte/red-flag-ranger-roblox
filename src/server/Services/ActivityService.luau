@@ -2,7 +2,7 @@
 	ActivityService: the shared activity framework.
 
 	  * Definitions (rewards, rules) come from Content/Activities.
-	  * Mechanics (Server/Activities/*) do the playing: Fetch, Agility,
+	  * Mechanics (Server/Activities/*) do the playing: Fetch, Frisbee, Agility,
 	    Grooming, TrickTraining, and world Props that start them.
 	  * One session per player at a time. Starting a new one interrupts the
 	    old one, which cleans up after itself through its onInterrupt.
@@ -26,7 +26,7 @@ local Places = require(ReplicatedStorage.Shared.Places)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local MechanicsFolder = script.Parent.Parent.Activities
-local MECHANICS = { "Fetch", "Agility", "Grooming", "TrickTraining", "Props" }
+local MECHANICS = { "Fetch", "Frisbee", "Agility", "Grooming", "TrickTraining", "Props" }
 
 export type Session = {
 	id: string,
@@ -179,6 +179,7 @@ function Activity.init(services)
 		module.init(services, Activity)
 	end
 	Activity.Fetch = mechanics.Fetch
+	Activity.Frisbee = mechanics.Frisbee
 
 	ActionService.register("unlock_activity", function(player, spec)
 		local profile = S.Data.get(player)
