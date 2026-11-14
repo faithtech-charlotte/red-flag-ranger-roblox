@@ -2,9 +2,13 @@
 	DialogueController: shows NPC lines and choices sent by the server, and
 	sends back only the chosen id. It never decides what happens next.
 
-	Conversations with other kids ("peer" NPCs) show practice Block / Report /
-	Get help buttons, the same way real chat has those tools. "Walk away"
-	(the ✕) is always available.
+	Every conversation shows the button bar the server lists in `bar`
+	(campaign-script 1.3): Leave (the ✕, always), Ask Lee for help (always,
+	except with Lee), and on story characters and peers Block (practice),
+	Report (practice) and, where the scene allows, Something feels off.
+	The name chip shows the dialogue label ("Story character", "Trusted
+	adult", "Practice roleplay"). A practice Pal Request card can sit under
+	the line; answering it only sends its id.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -26,6 +30,11 @@ local nameLabel: TextLabel
 local textLabel: TextLabel
 local choiceList: Frame
 local safetyBar: Frame
+local toolButtons: { [string]: TextButton } = {}
+local toolNote: TextLabel
+local palCard: Frame
+local palText: TextLabel
+local palButtons: { TextButton } = {}
 local current: any = nil
 local waiting = false
 local typeStarted = 0
@@ -63,10 +72,12 @@ local function show(view)
 	current = view
 	panel.Visible = true
 	local isTip = view.speaker == "tip"
-	panel.BackgroundColor3 = isTip and C.tip or C.panel
-	;(panel:FindFirstChildOfClass("UIStroke") :: UIStroke).Color = isTip and C.help or C.ink
-	nameChip.BackgroundColor3 = isTip and C.help or C.orange
-	nameLabel.Text = isTip and "💡 Ranger Tip" or (view.subtitle and `{view.npcName} · {view.subtitle}` or view.npcName)
+	local isCard = view.speaker == "card"
+	panel.BackgroundColor3 = (isTip or isCard) and C.tip or C.panel
+	;(panel:FindFirstChildOfClass("UIStroke") :: UIStroke).Color = isTip and C.help or (isCard and C.teal or C.ink)
+	nameChip.BackgroundColor3 = isTip and C.help or (isCard and C.teal or C.orange)
+	local tag = view.label or view.subtitle
+	nameLabel.Text = isTip and "💡 Ranger Tip" or (tag and `{view.npcName} · {tag}` or view.npcName)
 	textLabel.TextColor3 = isTip and C.tipInk or C.ink
 	textLabel.Text = view.text
 	textLabel.MaxVisibleGraphemes = 0
@@ -92,7 +103,42 @@ local function show(view)
 		table.insert(choiceButtons, b)
 	end
 
-	safetyBar.Visible = view.safetyTools == true and not isTip
+	-- The bar the server allows on this node (older payloads: peers only).
+	local bar = view.bar
+	if bar == nil then
+		bar = { "leave", "help" }
+		if view.safetyTools and not isTip then
+			table.insert(bar, "block")
+			table.insert(bar, "report")
+		end
+	end
+	local shown = {}
+	for _, id in bar do
+		shown[id] = true
+	end
+	local anyTool = false
+	for id, b in toolButtons do
+		b.Visible = shown[id] == true
+		anyTool = anyTool or b.Visible
+	end
+	toolNote.Visible = shown.block == true or shown.report == true
+	safetyBar.Visible = anyTool
+
+	-- Practice Pal Request card (records a choice only; nothing is sent).
+	if view.pal then
+		palCard.Visible = true
+		palText.Text = view.pal.text
+		for i, b in palButtons do
+			local c = view.pal.choices[i]
+			b.Visible = c ~= nil
+			if c then
+				b.Text = c.text
+				b:SetAttribute("ChoiceId", c.id)
+			end
+		end
+	else
+		palCard.Visible = false
+	end
 	Theme.pop(panel)
 	if UserInputService.GamepadEnabled and choiceButtons[1] then
 		GuiService.SelectedObject = choiceButtons[1]
@@ -160,7 +206,7 @@ function Dialogue.start(gui: ScreenGui)
 	nameChip.Parent = chipHolder
 	nameLabel = Theme.label("", { Size = UDim2.new(0, 0, 1, 0), AutomaticSize = Enum.AutomaticSize.X, Font = Theme.Fonts.title, TextSize = 20, TextColor3 = C.white, TextWrapped = false, ZIndex = 6, Parent = nameChip })
 
-	local close = Theme.button("✕ Walk away", C.inkSoft, function()
+	local close = Theme.button("✕ Leave", C.inkSoft, function()
 		if current then
 			send(Remotes.RequestKinds.DialogueClose, { sessionId = current.sessionId })
 		end
@@ -185,7 +231,7 @@ function Dialogue.start(gui: ScreenGui)
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
-		LayoutOrder = 2,
+		LayoutOrder = 3,
 		Parent = panel,
 		Children = { Theme.list(nil, 6) },
 	}) :: Frame
@@ -194,28 +240,67 @@ function Dialogue.start(gui: ScreenGui)
 		Size = UDim2.new(1, 0, 0, 0),
 		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
-		LayoutOrder = 3,
+		LayoutOrder = 4,
 		Parent = panel,
 		Children = { Theme.list(nil, 4) },
 	}) :: Frame
+	-- Practice Pal Request card, between the line and the choices.
+	palCard = new("Frame", {
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundColor3 = C.tip,
+		LayoutOrder = 2,
+		Visible = false,
+		Parent = panel,
+		Children = { Theme.corner(12), Theme.stroke(C.teal, 2), Theme.padding(8), Theme.list(nil, 6) },
+	}) :: Frame
+	palText = Theme.label("", { Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Font = Theme.Fonts.bold, TextSize = 18, LayoutOrder = 1, Parent = palCard })
+	Theme.label("Practice: nothing is sent.", { Size = UDim2.new(1, 0, 0, 16), TextSize = 13, TextColor3 = C.inkSoft, LayoutOrder = 2, Parent = palCard })
+	local palRow = new("Frame", {
+		Size = UDim2.new(1, 0, 0, 38),
+		BackgroundTransparency = 1,
+		LayoutOrder = 3,
+		Parent = palCard,
+		Children = { Theme.list(Enum.FillDirection.Horizontal, 8) },
+	})
+	for i = 1, 2 do
+		local b
+		b = Theme.button("", if i == 1 then C.green else C.inkSoft, function()
+			local id = b:GetAttribute("ChoiceId")
+			if current and typeof(id) == "string" then
+				send(Remotes.RequestKinds.DialogueChoose, { sessionId = current.sessionId, choiceId = id })
+			end
+		end, { Size = UDim2.new(0.48, 0, 1, 0), TextSize = 17, LayoutOrder = i, Parent = palRow })
+		table.insert(palButtons, b)
+	end
+
+	-- Button bar (1.3). Leave is the ✕ above; these follow the server's list.
 	local toolRow = new("Frame", {
-		Size = UDim2.new(1, 0, 0, 40),
+		Size = UDim2.new(1, 0, 0, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
 		BackgroundTransparency = 1,
 		LayoutOrder = 1,
 		Parent = safetyBar,
-		Children = { Theme.list(Enum.FillDirection.Horizontal, 8) },
+		Children = {
+			new("UIGridLayout", {
+				CellSize = UDim2.new(0.5, -4, 0, 38),
+				CellPadding = UDim2.fromOffset(8, 6),
+				SortOrder = Enum.SortOrder.LayoutOrder,
+			}),
+		},
 	})
 	local function tool(text: string, color: Color3, id: string, order: number)
-		Theme.button(text, color, function()
+		toolButtons[id] = Theme.button(text, color, function()
 			if current then
 				send(Remotes.RequestKinds.DialogueSafety, { sessionId = current.sessionId, tool = id })
 			end
-		end, { Size = UDim2.new(0.32, 0, 1, 0), TextSize = 17, LayoutOrder = order, Parent = toolRow })
+		end, { TextSize = 16, LayoutOrder = order, Visible = false, Parent = toolRow })
 	end
-	tool("🚫 Block", C.inkSoft, "block", 1)
-	tool("🚩 Report", C.orange, "report", 2)
-	tool("💙 Get help", C.help, "help", 3)
-	Theme.label("Practice tools: they don't contact Roblox.", { TextSize = 13, TextColor3 = C.inkSoft, Size = UDim2.new(1, 0, 0, 16), LayoutOrder = 2, Parent = safetyBar })
+	tool("💙 Ask Lee for help", C.help, "help", 1)
+	tool("🤔 Something feels off", C.purple, "off", 2)
+	tool("🚫 Block (practice)", C.inkSoft, "block", 3)
+	tool("🚩 Report (practice)", C.orange, "report", 4)
+	toolNote = Theme.label("Block and Report here are practice. They don't send anything.", { TextSize = 13, TextColor3 = C.inkSoft, Size = UDim2.new(1, 0, 0, 16), LayoutOrder = 2, Parent = safetyBar })
 
 	RunService.RenderStepped:Connect(function()
 		if current and textLabel.MaxVisibleGraphemes >= 0 then
