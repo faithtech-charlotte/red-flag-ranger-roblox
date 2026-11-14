@@ -95,6 +95,9 @@ local function submit()
 end
 
 function Adoption.start(gui: ScreenGui)
+	task.defer(function()
+		require(script.Parent.PanelCoordinator).track("adoption", overlay, Adoption.close)
+	end)
 	overlay = new("Frame", {
 		Name = "Adoption",
 		Size = UDim2.fromScale(1, 1),

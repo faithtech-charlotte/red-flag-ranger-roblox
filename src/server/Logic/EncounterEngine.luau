@@ -89,7 +89,8 @@ function EncounterEngine.select(content: Content, profile, npcId: string, locati
 
 	for _, arcId in npc.arcs or {} do
 		local arcDef = content.arcs[arcId]
-		if arcDef then
+		-- An unscheduled arc keeps its saved progress but never starts.
+		if arcDef and arcDef.scheduled ~= false then
 			local progress = EncounterEngine.ensureArc(profile, arcDef)
 			if not progress.done and progress.stage then
 				local idx = stageIndex(arcDef, progress.stage)

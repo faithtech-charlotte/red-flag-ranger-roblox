@@ -42,7 +42,7 @@ The project uses Rojo's tree mapping (`default.project.json`) to map source file
 See README.md for the game architecture. Key rules:
 - The world, NPCs, dogs and UI are all built in code at runtime (`WorldBuilder`, `DogRig`, `NPCService`, client controllers). There are no binary assets.
 - Server services expose `init(services)` then `start()`; they reach each other through the shared `services` table (see `src/server/init.server.luau`).
-- Dialogue and story content is data in `src/server/Content/`. All educational text is provisional pending Present Age review.
+- Dialogue and story content is data in `src/server/Content/` (practice-story scenes in `Content/Campaign/`, transcribed from `docs/campaign-script.md`; field reference at the top of `Campaign/Sparkz.luau`). All educational text is provisional pending Present Age review.
 - Clients send ids only; every outcome is decided and validated on the server.
 
 **Entry Points:**
@@ -60,6 +60,14 @@ See README.md for the game architecture. Key rules:
 - **Actions:** clients send `PetAction { action = ... }`; `PetInteractionService` validates against `PetActions` (touch distance, cooldown, bond unlocks) before running a handler.
 - **Must stay true:** the dog runs on the ground and never flies. Fetch chases a ground point under the ball, not the ball.
 
+## Practice stories (read before touching dialogue or campaign code)
+
+- **Flow:** `ProgressionService` feeds server events into `Logic/EncounterScheduler` (which beat may come next) and `Logic/LearningProgress` (the private 30-slot ledger). Each tick `Progression.consider` asks for at most one invitation (never while `InteractionState.busy`, only beats in `Content.beatScenes`); `StoryService` shows the card and runs onboarding, Cara's follow-up offer, the walk to Lee, and story presence.
+- **Scenes:** `EncounterService` sessions are `scene`, `card` (invitation / follow-up) or `tell` (Lee's menu, `Logic/LeeTell`). Every node sends a `bar` from `Logic/StoryRules.barFor`; the client renders only what the server lists. Facts are recorded when their node is sent; evidence comes only from `learning` actions and `ProgressionRules.exitEvents`, never from text.
+- **Must stay true:** campaign scenes grant no coins; agreements go to a `recovery` node and never play out; Lee's menu lists only facts on file and `done` is on every node; Help after a concerning request ends the scene and opens Lee for that beat; nothing learning-related replicates (the snapshot only gets `present`, npc id -> boolean). `ContentCheck` (run in tests over the real content) enforces scene metadata.
+- **Jordan:** his arc is `scheduled = false` while the campaign runs; he stays an ordinary peer.
+- **Testing in Studio:** about 2 s after adopting (or loading with a dog and no onboarding), Lee's welcome opens by radio, then Cara's intro; close or answer them before testing anything else. Invitations need an activity completed after onboarding and 90 s of active play between them.
+
 ## Gotchas
 
 - **Raycasts:** `CanQuery = false` is ignored on parts that collide, so exclude such parts (e.g. the fetch ball) explicitly with `RaycastParams`.
@@ -71,7 +79,7 @@ See README.md for the game architecture. Key rules:
 
 ## Controls (current)
 
-- **Whistle:** H / gamepad D-pad Up / the 📣 button (above the jump button on touch) calls the dog back from anywhere (`WhistleController`).
+- **Whistle:** H / gamepad D-pad Up / the 📣 button (above the jump button on touch) calls the dog back from anywhere (`WhistleController`). During an activity the first press (whistle or Sit/Stay/Come) shows a "Stop <activity>? Press again" confirm (client-side, from the player's `ActivityName` attribute that `ActivityService` sets); the server is unchanged.
 - **Action bar** (bottom-left, `ActionBarController`): Q / gamepad Y. Planned to be replaced by a tap-the-dog ring menu.
 - **Jump:** benches, fences and hurdles are solid to the player, who jumps them; the dog hops them by itself.
 - Planned: the dog becomes solid to players and sidesteps when walked into.
@@ -80,6 +88,7 @@ See README.md for the game architecture. Key rules:
 
 - `README.md`: game architecture and systems.
 - `docs/interaction-expansion-spec.md` + `docs/developer-handoff.md`: the next large feature spec (encounters, Pet Show, Trail Walk, Wash & Groom).
+- `docs/implementation-plan.md` (phases) + `docs/campaign-script.md` (every scene's text; owner decisions at the end).
 - `docs/HANDOFF.md`: latest session handoff notes.
 
 ## Rojo File Naming Conventions

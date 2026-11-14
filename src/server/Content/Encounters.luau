@@ -11,6 +11,21 @@
 
 local PROVISIONAL = "provisional"
 
+-- Owner decision on campaign note 6: when a general Help topic might be
+-- something the player lived in a park story (a concerning fact is on file
+-- that Lee hasn't heard), Lee gently asks. "Yes" opens the same tell menu,
+-- with the same credit.
+local STORY_QUESTION = {
+	text = "Did this happen in one of the park stories?",
+	conditions = { { type = "untoldStory" } },
+}
+local STORY_YES = {
+	id = "story_yes",
+	text = "Yes, in a park story.", -- PROVISIONAL: needs script line
+	conditions = { { type = "untoldStory" } },
+	actions = { { action = "open_scene", scene = "lee_tell", mode = "general" } },
+}
+
 local Encounters = {}
 
 ----------------------------------------------------------------------------
@@ -115,7 +130,7 @@ Encounters.jordan_e3_boundary = {
 		},
 		ask = {
 			speaker = "npc",
-			text = "Let's talk on Snapchat instead. It's way easier. But keep it just between us, okay? Don't tell any grown-ups.",
+			text = "Let's talk on another app instead. It's way easier. But keep it just between us, okay? Don't tell any grown-ups.",
 			choices = {
 				{
 					id = "decline",
@@ -272,8 +287,8 @@ Encounters.coach_locked = {
 	nodes = {
 		hi = {
 			speaker = "npc",
-			text = "Welcome! Warm up with a game of fetch at Sunny Dog Park first, then come back and run the course.",
-			choices = { { id = "ok", text = "Will do!", actions = { { action = "show_waypoint", placeId = "dog_park" } } } },
+			text = "Welcome! Adopt a dog at the Pet Store first, then come back and run the course together.",
+			choices = { { id = "ok", text = "Will do!", actions = { { action = "show_waypoint", placeId = "pet_store" } } } },
 		},
 	},
 }
@@ -311,24 +326,43 @@ Encounters.help_lee = {
 			speaker = "npc",
 			text = "Hi, I'm Ranger Lee. I'm always here, and you never need a reason to come talk. Is something on your mind?",
 			choices = {
+				-- Campaign 3.1: only when at least one fact is on file.
+				{
+					id = "story",
+					text = "Something happened in a park story.",
+					conditions = { { type = "anyFactOnFile" } },
+					actions = { { action = "open_scene", scene = "lee_tell", mode = "general" } },
+				},
 				{ id = "secret", text = "Someone asked me to keep a secret.", next = "secret" },
 				{ id = "app", text = "Someone wants to chat on another app.", next = "app" },
 				{ id = "tools", text = "How do I block or report on Roblox?", next = "tools" },
 				{ id = "hi", text = "Just saying hi!", next = "bye" },
+				-- Owner decision (note 14): Lee can open the practice menu too.
+				{
+					id = "practice",
+					text = "Can I practice a park story?", -- PROVISIONAL: needs script line
+					conditions = { { type = "campaignBeat", beat = "e2", statuses = { "resolved", "skipped", "skipped_by_block" } } },
+					actions = { { action = "open_scene", scene = "lee_practice_menu" } },
+				},
 			},
 		},
 		secret = {
 			speaker = "npc",
 			text = "Thanks for telling me. You're not in trouble. A safe friend won't ask you to hide things from the grown-ups who care about you. A parent, caregiver, teacher, coach, or school counselor can help.",
+			addText = { STORY_QUESTION },
 			choices = {
+				STORY_YES,
 				{ id = "more", text = "What else can I do?", next = "tools" },
 				{ id = "thanks", text = "Thanks, Ranger Lee.", actions = { { action = "pet_react", mood = "love" } } },
 			},
 		},
 		app = {
 			speaker = "npc",
-			text = "Good thinking to pause. If someone online wants to move to Snapchat, Discord, or any other app, especially in secret, talk to a trusted adult first.",
+			-- Plan change 19 / campaign 3.1: no real platform names.
+			text = "Good thinking to pause. If someone wants to move to another app, especially in secret, talk to a trusted adult first.",
+			addText = { STORY_QUESTION },
 			choices = {
+				STORY_YES,
 				{ id = "more", text = "What else can I do?", next = "tools" },
 				{ id = "thanks", text = "Thanks, Ranger Lee.", actions = { { action = "pet_react", mood = "love" } } },
 			},

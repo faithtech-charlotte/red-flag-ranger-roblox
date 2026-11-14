@@ -1,80 +1,61 @@
-# Handoff: Red Flag Rangers, 2026-11-14
+# Handoff: interaction expansion, 2026-11-14 (session 4)
 
-Start by reading `README.md` (architecture, Phase 2, the feel overhaul) and
-`CLAUDE.md`. Then read this.
+Read `CLAUDE.md`, then `docs/implementation-plan.md` (r3, Codex-approved; source of truth for phases and decisions), then this, then `docs/phase2-notes.md`.
 
-## Where things stand
+## Session 5 (2026-11-14): Phase 2 verified, PR open
 
-- Branch `feat/pet-interaction-phase-2`, based on `main`, which has PR #1 (the MVP) merged.
-- **Nothing on this branch is committed yet.** It holds two rounds of work:
-  1. Phase 2: Bond XP and levels, behavior state machine, activity framework (fetch, agility medals, spa, trick training), Treat Shop, Ranger HQ mission board, 8 new quests, profile schema v2 migration.
-  2. Gameplay feel overhaul: hands-on petting (`Client/Controllers/PettingController`), a physics ball tool for fetch (`Server/Activities/Fetch`, `Client/Controllers/BallController`), a compact action bar (`Client/Controllers/ActionBarController`), and "alive" idle behaviors (`Client/Controllers/PetController`).
-- The owner hasn't approved committing. Ask before you commit, and suggest two commits (Phase 2, then the feel overhaul).
-- Tests: 43 pass (`print(require(game.ServerStorage.Tests)())` in Studio).
+- Branch pushed as `feat/interaction-expansion`; **draft PR #14** into `main`. `main` (frisbee field, jump obstacles, roblox skill) merged in at 41e72dd.
+- Tests 275/275. Codex Phase 2 review APPROVE after 4 rounds. Track B checklist and the whole Phase 2 Studio checklist pass (results and found issues in `docs/phase2-notes.md`).
+- Fixed in Studio: ContentCheck brace, Codex folds, story card closes when an activity starts, Sparkz moved away from the squeaky duck (its prompt stole E).
+- Open, small: Rinse 💧 and the Help popup's close button render as empty boxes; Riley's card has no label; Lee-narrated roleplay lines mention asking Lee; spa via Hold Space is an easy 3 stars; the real Space-key squirrel hold is unconfirmed by hand.
+- Studio MCP: if tools vanish, stale `StudioMCP` processes from other sessions hold the connection; ending them (owner approved) restored it. Codex MCP was down; `~/.local/bin/codex exec -s read-only` works directly.
+- Next: owner's feel playtest (Track B) and Studio check (Phase 2); then Phase 3 leftovers and Phase 4.
 
-## Last fix (verified in Studio)
+## Rules from the owner
 
-The owner reported: "When fetching, the dog leaps in the air and reaches the ball in one bound. It needs to run, not fly."
+- Additive changes unless a requirement needs a new abstraction.
+- Trail Walk and Wash & Groom are core, never cut. No deadline.
+- Codex reviews every phase diff; fold its findings and resend until APPROVE. Codex MCP is down: use the `codex:codex-rescue` agent with a READ-ONLY prompt and absolute paths.
+- "Question mode" = AskUserQuestion. The spec overrides the research Storyline doc on purpose.
+- Ask before stopping the owner's Studio Play session. Never push without the owner's word.
+- Worktree agents start from `main`: tell them to `git reset --hard` onto the integration branch first, and never let them use Studio (one shared Studio; the orchestrator serializes tests).
+- Another session ("Red Flag Rangers dog controls") is building the tap-the-dog ring and solid dog off `main` (PetService, PetController, ActionBarController). Ping it before touching those.
 
-The cause was a raycast that hit the ball itself. **On a part that collides, `CanQuery = false` is ignored**, so ground checks under the ball returned the ball's own height, and the dog's chase target followed the ball into the air.
+## Branch state
 
-The fix:
-- **Ground point:** the dog now chases a point on the ground under the ball (`PetChase_<UserId>` in Terrain), and every ground raycast excludes the ball.
-- **Smooth chase:** the owner's client also moves that point every frame, since the owner simulates the dog's physics.
-- **Catching:** a catch needs the dog under the ball and the ball low. Low airborne balls get a small leap animation (`LeapAt` attribute).
-- **Running back:** a dog that is returning is no longer teleported back by the stuck-recovery check; it runs. Chase speed is 30.
-- **Following:** the follow target is also kept on the ground on the client, so the dog shouldn't float up when you jump. **I haven't tested jumping.**
+Work is on **`worktree-trackb-integrate`** (worktree `.claude/worktrees/trackb-integrate`), which is `feat/interaction-expansion` (90e7112) plus:
 
-Measured: on a 46-stud throw, the dog's height stayed at 1.7 (ground level) the whole time, while the ball rose to 38.
+| Commit | What | Status |
+|---|---|---|
+| 8bf0081..3fddcd7 (already on feat/interaction-expansion) | Track B: Trail Walk, Wash & Groom gestures, ratings, whistle confirm, agility at adoption | 167 tests passed in Studio |
+| 59039f9 | Track B Codex folds: grooming pays at completion + token-guarded cleanup; queued squirrel moments; death/respawn interrupts any activity (`ActivityService`) | **Codex APPROVE**, not yet run |
+| 77303b7..434a1d6 (8 commits) | Phase 2 story slice (see `docs/phase2-notes.md`) | **Never run, not reviewed** |
 
-## What the owner asked for next
+`feat/interaction-expansion` has NOT been moved. Once tests pass, fast-forward it to `worktree-trackb-integrate`. Nothing is pushed.
 
-The owner wants to see options before anything is built, starting with the controls.
+## Next, in order
 
-1. **You shouldn't be able to walk through the dog.**
-   - Today every dog part has `CanCollide = false`, and the dog floats on one `AlignPosition` (`Server/Services/PetService`).
-   - The dog's physics run on the owner's client.
-   - Any collider has to avoid: shoving the player around (the `AlignPosition` force is huge), getting stuck on fences and hurdles, and colliding with the fetch ball. Collision groups already exist: `FetchBall` and `Characters`.
-   - Options to weigh:
-     - A collider part in a `Pets` group that collides only with `Characters`.
-     - Ground-bound movement: force on the X and Z axes only, plus gravity.
-     - Soft avoidance: the dog steers away from the player.
+1. **Studio**: the MCP connection broke in session 4 and `/mcp` reconnect didn't restore the tools; a fresh session should. Sync (below), run tests (expect ~248). Fix failures (Phase 2 code was written without a Luau toolchain, so syntax/type errors are likely).
+2. Clean boot in Play; check console.
+3. Track B manual checklist: trail markers in order, squirrel hold ≥1.8 s inside 6 s, walk never fails, stars; spa gestures per step, shake, stars; first whistle press during an activity asks, second cancels; dying mid-activity ends it cleanly.
+4. Codex review of the Phase 2 diff (`git diff 59039f9 434a1d6`), fold until APPROVE.
+5. Phase 2 Studio checklist (`docs/phase2-notes.md`), then the owner's feel playtest (Track B) and Studio check (Phase 2).
+6. Then Phase 3 leftovers (journal objective "pick any activity") and Phase 4 per the plan.
 
-2. **The dog has no shadow.**
-   - Every part except `Root` has `CastShadow = true`.
-   - The likely cause is `Lighting.Technology = Voxel` (set in `default.project.json`). Voxel shadows are coarse, so a small dog casts almost none.
-   - Options: switch to `ShadowMap` or `Future` (check how it looks and performs everywhere, including indoors), or add a blob-shadow decal under the dog.
+## Studio notes
 
-3. **Rethink the dog controls, and present options.** Today:
-   - An action bar slides in at the bottom-left when you stand still near the dog. Q / gamepad Y opens it.
-   - Buttons: Pet, Ball, Care popover, Sit/Come, Stay, Tricks popover.
-   - The ball is a Roblox Tool, and petting has its own mode with its own camera.
-   - The owner isn't happy with the controls. Bring 2 or 3 clearly different designs with their trade-offs for desktop, touch and gamepad, and a recommendation, before building. Ideas to consider:
-     - a radial menu that opens around the dog
-     - clicking or tapping the dog itself
-     - hotbar-style tools (ball, treat, brush)
-     - keybinds for the most common actions
+- Sync: `cd tools/studio-sync && python3 build_manifest.py ../.. manifest.json`, serve with `python3 -m http.server 34999 --bind 127.0.0.1` (from that folder in the worktree), stop Play, run the body of `sync.luau` via MCP `execute_luau` (Edit).
+- `execute_luau` in Server/Client runs in a separate require cache: observe through remotes, pushes, attributes and console output.
+- `DialogueChoose` is rate-limited to 0.15 s; space test requests ≥0.4 s apart.
+- Starting Play via MCP `start_stop_play` hung the MCP connection in session 4. If it happens again, ask the owner to start Play by hand.
 
-4. **A persistent, easy way to whistle the dog back.**
-   - It should always be on screen and work from anywhere: one key plus one on-screen button that touch and gamepad can reach.
-   - It should give feedback: a whistle sound, a "!" over the dog, and the dog running back.
-   - The server already has a `come` action: `PetInteractionService` handles `petAction { action = "come" }`. It interrupts any activity and sets the dog to Following.
-   - There is no whistle sound asset yet; the built-in sounds are listed in `Client/UI/Sounds.luau`.
+## Open (not blocking)
 
-## Session 2 (2026-11-14, later): what happened
+- Who reviews the dialogue, and when: undecided.
+- Solo vs shared servers: build shared-safe; decide at publish.
+- Owner may want to tune Track B scoring: shine base (2 stars if steps average ≤12 s), evenness ±1 star at ≥0.7/≤0.3, trail score 0.6 holds + 0.3 time vs par (60 s) + 0.1 sniffs.
 
-- I read this handoff and checked Studio. **The owner was in Play mode with Sparky adopted. Don't stop their playtest without asking.**
-- **Shadow, partial check:** at runtime `GlobalShadows` is on, the dog's `Body` has `CastShadow = true`, and the player's character does cast a soft shadow. Scripts can't read `Lighting.Technology`; `default.project.json` sets it to Voxel. I couldn't get the dog into a screenshot without disturbing the owner's session, so **"Voxel is too coarse for a small dog" is still a hypothesis.** Test it before choosing a fix: in Edit mode, build a `DogRig` dog in the open and screenshot it.
-- **Options draft:** I put the questions below to the owner as a multiple-choice dialog. **They rejected the dialog and asked for a handoff instead, so nothing is decided.** Don't assume these are approved. Show them as a short written comparison (the owner prefers tables and drafts), not a dialog, unless they ask for one.
-
-| Ask | Option A | Option B | Option C | My lean |
-|---|---|---|---|---|
-| Controls | **Tap the dog**: click or tap Sparky and a small ring of 4–5 actions opens around him. Keys 1–5 as shortcuts; on gamepad, hold Y and pick with the stick. Nothing on screen until you touch him. | **Pet tools in the hotbar**: Ball, Treat and Brush in the standard Roblox hotbar (keys 1–3). Empty hands + click Sparky = pet. Sit, Stay and Come live on the whistle (tap = Come, hold = command wheel). | **Fixed dock + keys**: always-visible dock at the bottom center (Whistle, Pet, Ball, Treat, More), each with a key. Most discoverable, but close to the action bar the owner disliked. | A |
-| Whistle key (touch: round button above the jump button; gamepad: D-pad Up) | R (unused by Roblox's default controls) | H ("here") | Q (Q currently opens the action bar) | R |
-| Walking through the dog | Solid to players only, **and** he sidesteps when you walk into him | Solid only (can wedge or block doorways) | Sidestep only, never solid (may still clip at sprint speed) | A |
-| Shadow | Soft blob shadow under the dog (cheap, cartoony, changes nothing else) | Switch the whole game to ShadowMap lighting (crisper shadows everywhere; changes the overall and indoor look; costs performance on phones) | | A |
-
-## Session 3 (2026-11-14): jumping obstacles
+## From main: jumping obstacles (merged 2026-11-14, PR #11)
 
 - **Player:** benches, fences and hurdles were already collidable but low enough to step over. `WorldBuilder` now adds invisible `PlayerBlocker` walls (3.2 to 3.4 studs, collision group `PlayerBlocker`, collides with `Characters` only), so the player has to jump them.
 - **Dog:** the visible parts are tagged `JumpObstacle`. `PetController` lifts the dog's body over them using `Shared/ObstacleHop` (animation only: the root stays on the ground, on every client). Ground and aim raycasts exclude both tags, so the follow target no longer climbs onto benches and rails.
@@ -82,27 +63,3 @@ The owner wants to see options before anything is built, starting with the contr
 - **Dog sinking when you jump:** the follow target rides your character during the physics step, so the dog rose with a jump and dipped under the floor on the way down. `PetController.keepOnGround` now puts a Following/Returning dog back on the ground under its own feet after every physics step (owner client only). Not played yet.
 - A hand-built `Workspace.World` needs its own tags and blockers. Trees, lamp posts, weave poles and buildings are unchanged (the dog still passes through them).
 
-## How to work in Studio (important)
-
-- Rojo isn't installed. Use `tools/studio-sync/` (see its README): build `manifest.json`, serve it on port 34999, stop Play, then run `sync.luau` through the Studio MCP `execute_luau` tool in Edit mode.
-- Studio instance: `red-flag-ranger-roblox.rbxlx`. DataStores don't work (the place is unpublished), so profiles are temporary and the HUD shows "Not saving".
-- `screen_capture` works in Play mode. Allow for delay: the dog finishes a fetch faster than you can take the next screenshot.
-- Coordinates for `user_mouse_input` are in GUI space. That's the viewport minus the 58-px top inset. `GetMouseLocation()` includes the inset.
-- `instance_path` clicks need unique names. Action bar buttons are named `PetActionBar.Row.Action_<Label>`.
-- The adoption screen opens automatically. In tests, adopt by calling `Remotes.Request:InvokeServer("adopt", { breedId = "golden", name = "Sparky" })` from the Client datamodel.
-- Petting stops after 12 s without strokes. Long gaps between tool calls end the session; that's expected.
-
-## Not tested yet
-
-- Touch and real gamepads.
-- Whether the Roblox hotbar shows the Ball tool; it didn't appear in screenshots.
-- Two or more players.
-- Saving across sessions (needs a published place).
-- The spa fix that teleports the dog into the tub (passes unit tests, not played since).
-- Jumping while the dog follows.
-
-## Missing production assets
-
-- **Sounds:** bark, whine, pant, crunch, squeaky ball, bounce, whistle.
-- **Animations:** authored dog animations (hook: `PetCatalog.AnimationIds`).
-- **Art:** a hand cursor image and heart textures.

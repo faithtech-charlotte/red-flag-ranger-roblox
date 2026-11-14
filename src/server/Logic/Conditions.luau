@@ -91,6 +91,97 @@ evaluators.arcFlag = function(c, ctx)
 	return ctx.arc ~= nil and ctx.arc.flags[c.key] == c.equals
 end
 
+-- Practice-story campaign (profile.campaign is EncounterScheduler state;
+-- profile.learningV2 is LearningProgress state). Read-only checks.
+evaluators.campaignBeat = function(c, ctx)
+	local campaign = ctx.profile.campaign
+	local status = campaign and campaign.beats and campaign.beats[c.beat] or "not_started"
+	if c.statuses then
+		return table.find(c.statuses, status) ~= nil
+	end
+	return status == c.status
+end
+
+evaluators.showEligible = function(_c, ctx)
+	local campaign = ctx.profile.campaign
+	return campaign ~= nil and (campaign.completedActivities or 0) >= 4
+end
+
+evaluators.factSeen = function(c, ctx)
+	local ledger = ctx.profile.learningV2
+	local facts = ledger and ledger.seenFacts and ledger.seenFacts[c.beat]
+	return facts ~= nil and facts[c.fact] == true
+end
+
+evaluators.hasTitle = function(c, ctx)
+	local ledger = ctx.profile.learningV2
+	return ledger ~= nil and ledger.titles ~= nil and ledger.titles[c.title] == true
+end
+
+-- Phase 2 story conditions (read-only). profile.story is StoryRules state.
+local ASSESSED = { "e2", "e3", "e4", "e5" }
+
+local function story(ctx)
+	return ctx.profile.story or {}
+end
+
+-- A missing flag reads as false.
+evaluators.storyFlag = function(c, ctx)
+	return (story(ctx)[c.key] == true) == (c.equals ~= false)
+end
+
+evaluators.palChoice = function(c, ctx)
+	return (story(ctx).palChoice or "none") == c.equals
+end
+
+evaluators.evidenceMissing = function(c, ctx)
+	local ledger = ctx.profile.learningV2
+	local points = ledger and ledger.evidence and ledger.evidence[c.slot] or 0
+	return points < 1
+end
+
+evaluators.toldLee = function(c, ctx)
+	local ledger = ctx.profile.learningV2
+	local told = ledger ~= nil and ledger.toldLee ~= nil and ledger.toldLee[c.beat] == true
+	return told == (c.equals ~= false)
+end
+
+evaluators.factsOnFile = function(c, ctx)
+	local ledger = ctx.profile.learningV2
+	local facts = ledger and ledger.seenFacts and ledger.seenFacts[c.beat]
+	return facts ~= nil and next(facts) ~= nil
+end
+
+evaluators.anyFactOnFile = function(_c, ctx)
+	local ledger = ctx.profile.learningV2
+	for _, facts in ledger and ledger.seenFacts or {} do
+		if next(facts) ~= nil then
+			return true
+		end
+	end
+	return false
+end
+
+-- A concerning beat (e2-e5) has facts on file that Lee hasn't heard yet.
+evaluators.untoldStory = function(_c, ctx)
+	local ledger = ctx.profile.learningV2
+	if not ledger or not ledger.seenFacts then
+		return false
+	end
+	for _, beat in ASSESSED do
+		local facts = ledger.seenFacts[beat]
+		if facts and next(facts) ~= nil and not (ledger.toldLee and ledger.toldLee[beat]) then
+			return true
+		end
+	end
+	return false
+end
+
+evaluators.npcBlocked = function(c, ctx)
+	local state = ctx.profile.npcs and ctx.profile.npcs[c.npcId]
+	return state ~= nil and state.blocked == true
+end
+
 function Conditions.knownTypes(): { [string]: boolean }
 	local set = {}
 	for k in evaluators do

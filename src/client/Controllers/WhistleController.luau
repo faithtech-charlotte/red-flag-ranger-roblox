@@ -9,6 +9,13 @@
 	conversation, so it can't cover a choice). Whistling plays a chirp right
 	away; the server drops whatever the dog was doing, puts a "!" over it, and
 	it runs back to you. See PetInteractionService handlers.whistle.
+
+	During an activity (fetch, agility, spa, training, trail walk) the first
+	press asks "Stop <activity>? Press again" for CONFIRM_SECONDS; a second
+	press inside that window cancels it and the dog comes. The same confirm
+	guards the Sit / Stay / Come commands (Whistle.confirmStop). The check is
+	client-side UX only: the server is unchanged and still decides (a
+	whistle or command always interrupts the activity there).
 ]]
 
 local GuiService = game:GetService("GuiService")
@@ -32,6 +39,7 @@ local KEY = Enum.KeyCode.H
 local PAD = Enum.KeyCode.DPadUp
 local SIZE = 60
 local GAP = 10 -- space between the jump button and the whistle
+local CONFIRM_SECONDS = 3
 
 local Whistle = {}
 local ctl
@@ -40,6 +48,10 @@ local button: TextButton
 local circle: Frame
 local hint: TextLabel
 local readyAt = 0
+local confirmUntil = 0
+local confirmPanel: Frame
+local confirmText: TextLabel
+local confirmFill: Frame
 
 local function hasDog(): boolean
 	return State.data ~= nil and State.data.pet ~= nil
@@ -51,9 +63,53 @@ local function bounce()
 	TweenService:Create(scale, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Scale = 1 }):Play()
 end
 
+local function hideConfirm()
+	confirmUntil = 0
+	confirmPanel.Visible = false
+end
+
+--[[
+	Call before a whistle or a dog command. Returns true when it should go
+	ahead: no activity is running, or this is the second press within the
+	confirm window. Otherwise shows "Stop <activity>? Press again" and
+	returns false. `again` names the control to press again (e.g. "H").
+]]
+function Whistle.confirmStop(again: string?): boolean
+	local name = player:GetAttribute("ActivityName")
+	if typeof(name) ~= "string" then
+		hideConfirm()
+		return true
+	end
+	local now = os.clock()
+	if now < confirmUntil then
+		hideConfirm()
+		return true
+	end
+	confirmUntil = now + CONFIRM_SECONDS
+	local press = again and `Press {again} again` or "Press again"
+	confirmText.Text = `✋ Stop {name}?\n{press} to stop and call your dog.`
+	confirmPanel.Visible = true
+	Theme.pop(confirmPanel)
+	Sounds.play("click")
+	return false
+end
+
+local function againLabel(): string
+	local last = UserInputService:GetLastInputType()
+	if last == Enum.UserInputType.Touch then
+		return "📣"
+	elseif last.Name:find("Gamepad") then
+		return "D-pad ↑"
+	end
+	return "H"
+end
+
 function Whistle.blow()
 	if not hasDog() then
 		ctl.HUD.toast("Adopt a dog first!")
+		return
+	end
+	if not Whistle.confirmStop(againLabel()) then
 		return
 	end
 	local now = os.clock()
@@ -159,6 +215,33 @@ function Whistle.start(screenGui: ScreenGui, controllers)
 		Children = { Theme.corner(9) },
 	})
 	button.Activated:Connect(Whistle.blow)
+
+	-- "Stop <activity>? Press again" (with a shrinking bar for the time left).
+	confirmPanel = new("Frame", {
+		Name = "StopActivityConfirm",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.62),
+		Size = UDim2.fromOffset(380, 0),
+		AutomaticSize = Enum.AutomaticSize.Y,
+		BackgroundColor3 = C.bg,
+		Visible = false,
+		ZIndex = 30,
+		Parent = gui,
+		Children = { Theme.corner(16), Theme.stroke(C.orange, 4), Theme.padding(10), Theme.list(nil, 6), new("UISizeConstraint", { MaxSize = Vector2.new(380, 200) }) },
+	}) :: Frame
+	confirmText = Theme.label("", { Font = Theme.Fonts.title, TextSize = 20, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, LayoutOrder = 1, ZIndex = 31, Parent = confirmPanel })
+	local track = new("Frame", { Size = UDim2.new(1, 0, 0, 8), BackgroundColor3 = Color3.fromRGB(230, 225, 240), LayoutOrder = 2, ZIndex = 31, Parent = confirmPanel, Children = { Theme.corner(4) } })
+	confirmFill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = C.orange, ZIndex = 32, Parent = track, Children = { Theme.corner(4) } }) :: Frame
+	RunService.RenderStepped:Connect(function()
+		if confirmPanel.Visible then
+			local left = confirmUntil - os.clock()
+			if left <= 0 or player:GetAttribute("ActivityName") == nil then
+				hideConfirm()
+			else
+				confirmFill.Size = UDim2.fromScale(left / CONFIRM_SECONDS, 1)
+			end
+		end
+	end)
 
 	UserInputService.InputBegan:Connect(function(input, processed)
 		-- processed: typing in chat, or D-pad navigating a selected menu.

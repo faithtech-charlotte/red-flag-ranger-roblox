@@ -158,6 +158,14 @@ local function buildNPC(def, placement): Model
 	decorate(model, def)
 	model:SetAttribute("NpcId", def.id)
 	model:SetAttribute("LocationId", placement.locationId)
+	-- Read by the client's one visibility rule (WorldController): a
+	-- story-only NPC is hidden unless that player's story has it present.
+	if def.storyOnly then
+		model:SetAttribute("StoryOnly", true)
+	end
+	if def.companionDog then
+		model:SetAttribute("CompanionDog", true)
+	end
 	return model
 end
 

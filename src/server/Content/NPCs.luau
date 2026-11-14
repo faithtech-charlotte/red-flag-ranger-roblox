@@ -74,6 +74,7 @@ return {
 		id = "ranger_lee",
 		displayName = "Ranger Lee",
 		subtitle = "Trusted Adult",
+		label = "Trusted adult",
 		role = "trusted_adult",
 		promptText = "Ask for help",
 		appearance = { skin = rgb(110, 70, 45), shirt = rgb(46, 160, 120), pants = rgb(120, 95, 60), hair = rgb(20, 15, 10), hat = rgb(150, 110, 60) },
@@ -92,7 +93,8 @@ return {
 		placements = {
 			{ locationId = "dog_park", position = Vector3.new(-108, 0, -12), faces = Vector3.new(-90, 0, -40) },
 		},
-		encounters = { "riley_hi", "riley_again" },
+		-- green_riley (the campaign step before E2) wins while it's open.
+		encounters = { "green_riley", "riley_hi", "riley_again" },
 		idleLine = "Hi again! Have you tried the ball bucket? I bet {petName} can catch three in a row!",
 	},
 	jordan = {
@@ -105,7 +107,43 @@ return {
 			{ locationId = "dog_park", position = Vector3.new(-72, 0, -24), faces = Vector3.new(-90, 0, -40) },
 			{ locationId = "agility", position = Vector3.new(-42, 0, -142), faces = Vector3.new(0, 0, -120) },
 		},
-		arcs = { "jordan_arc" },
+		arcs = { "jordan_arc" }, -- unscheduled while the campaign runs (StoryArcs)
 		idleLine = "Hey! Fun day, huh?",
+	},
+
+	-- Practice-story characters (docs/campaign-script.md 1.2). Ordinary
+	-- looks, fictional identities, labeled "Story character" in dialogue.
+	cara = {
+		id = "cara",
+		displayName = "Cadet Cara",
+		subtitle = "Story character",
+		label = "Story character",
+		role = "peer",
+		appearance = { skin = rgb(176, 122, 84), shirt = rgb(64, 170, 220), pants = rgb(60, 70, 90), hair = rgb(35, 22, 15) },
+		placements = {
+			{ locationId = "pet_store", position = Vector3.new(12, 0, 24), faces = Vector3.new(0, 0, 24) },
+		},
+		encounters = { "cara_practice_menu" },
+		idleLine = "Hi! Pickles says hi too.", -- PROVISIONAL: needs script line
+	},
+	sparkz_pup = {
+		id = "sparkz_pup",
+		displayName = "Sparkz_Pup",
+		subtitle = "Story character",
+		label = "Story character",
+		role = "peer",
+		-- Shown to a player only while one of their Sparkz beats is open
+		-- (StoryRules.presence) and never once blocked. Its dog is a
+		-- client-only copy of that player's own breed.
+		storyOnly = true,
+		companionDog = true,
+		appearance = { skin = rgb(240, 200, 160), shirt = rgb(120, 200, 120), pants = rgb(70, 80, 120), hair = rgb(150, 100, 50) },
+		placements = {
+			-- Kept 12+ studs from the park props: a nearer E prompt (the squeaky
+			-- duck) would take the key and Sparkz could not be talked to.
+			{ locationId = "dog_park", position = Vector3.new(-114, 0, -70), faces = Vector3.new(-90, 0, -40) },
+		},
+		encounters = { "park_e1_hello", "park_e2_deal" },
+		idleLine = "Hey!", -- PROVISIONAL: needs script line
 	},
 }

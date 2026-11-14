@@ -407,6 +407,9 @@ function Pet.adopt(player: Player, payload: any): (boolean, string?, any?)
 	local id = HttpService:GenerateGUID(false)
 	profile.pets[id] = ProfileSchema.newPet(id, breed.id, name :: string, os.time())
 	profile.activePetId = id
+	-- The Agility Course is open from day one (the first-fetch quest still
+	-- completes and pays; its unlock reward becomes a harmless repeat).
+	profile.unlocks.agility = true
 	Pet.spawn(player)
 	Pet.react(player, "love")
 	EventBus.publish("pet.adopted", player, { petId = id, breedId = breed.id })
@@ -484,6 +487,12 @@ function Pet.start()
 	end)
 	-- Profile may finish loading after the character exists.
 	S.Data.onLoaded(function(player)
+		-- Saves from before agility opened at adoption: open it for anyone
+		-- who already has a dog.
+		local profile = S.Data.get(player)
+		if profile and profile.activePetId and not profile.unlocks.agility then
+			profile.unlocks.agility = true
+		end
 		if player.Character then
 			onCharacter(player, player.Character)
 		end

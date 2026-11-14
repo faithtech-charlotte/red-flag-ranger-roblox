@@ -34,11 +34,13 @@ Remotes.RequestKinds = {
 	GroomStep = "groomStep",
 	ActivityCancel = "activityCancel",
 	TrainPress = "trainPress",
+	TrailHold = "trailHold", -- { runId, challengeId, phase = "start" | "end" }
 	DialogueChoose = "dialogueChoose",
 	DialogueClose = "dialogueClose",
 	DialogueSafety = "dialogueSafety",
 	RequestHelp = "requestHelp",
 	Unblock = "unblock",
+	PanelState = "panelState", -- client-only panel opened/closed (suppresses story invitations only)
 }
 
 -- Server -> client push kinds.
@@ -59,6 +61,7 @@ Remotes.PushKinds = {
 	Frisbee = "frisbee",
 	Grooming = "grooming",
 	Training = "training",
+	TrailWalk = "trailWalk",
 	OpenMissions = "openMissions",
 }
 

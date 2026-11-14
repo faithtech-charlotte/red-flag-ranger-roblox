@@ -32,7 +32,11 @@ local controllers = {
 	Missions = require(Controllers.MissionsController),
 	World = require(Controllers.WorldController),
 	Whistle = require(Controllers.WhistleController),
+	GroomingGestures = require(Controllers.GroomingGestures),
+	TrailWalk = require(Controllers.TrailWalkController),
 }
+
+controllers.Panels = require(Controllers.PanelCoordinator)
 
 controllers.HUD.start(gui, controllers)
 controllers.Dialogue.start(gui, controllers)
@@ -47,3 +51,5 @@ controllers.Activity.start(gui, controllers)
 controllers.Missions.start(gui, controllers)
 controllers.World.start(gui, controllers)
 controllers.Whistle.start(gui, controllers)
+controllers.GroomingGestures.start(gui, controllers)
+controllers.TrailWalk.start(gui, controllers)

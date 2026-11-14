@@ -22,11 +22,12 @@ local ActionService = require(script.Parent.Parent.Core.ActionService)
 local EventBus = require(script.Parent.Parent.Core.EventBus)
 local Conditions = require(script.Parent.Parent.Logic.Conditions)
 local Definitions = require(script.Parent.Parent.Content.Activities)
+local Ratings = require(script.Parent.Parent.Logic.Ratings)
 local Places = require(ReplicatedStorage.Shared.Places)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local MechanicsFolder = script.Parent.Parent.Activities
-local MECHANICS = { "Fetch", "Frisbee", "Agility", "Grooming", "TrickTraining", "Props" }
+local MECHANICS = { "Fetch", "Frisbee", "Agility", "Grooming", "TrickTraining", "TrailWalk", "Props" }
 
 export type Session = {
 	id: string,
@@ -47,8 +48,14 @@ function Activity.def(id: string)
 	return Definitions[id]
 end
 
+-- The player's root part, or nil when there is no living character (a dead
+-- character can't make progress in any activity).
 function Activity.hrp(player: Player): BasePart?
 	local c = player.Character
+	local humanoid = c and c:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.Health <= 0 then
+		return nil
+	end
 	return c and c:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
@@ -77,11 +84,34 @@ function Activity.current(player: Player): Session?
 	return sessions[player]
 end
 
+-- Mirrors "is this player in an activity" onto the player (ActivityName
+-- attribute), so the client can ask "stop this?" before a whistle or a
+-- command cancels it. Display only: the server still decides everything.
+local function mirror(player: Player)
+	if typeof(player) ~= "Instance" then
+		return -- unit tests use plain tables as players
+	end
+	local session = sessions[player]
+	local name = nil
+	if session then
+		local def = Definitions[session.id] or Definitions[(string.gsub(session.id, "_play$", ""))]
+		name = def and def.name or "this activity"
+	end
+	if player:GetAttribute("ActivityName") ~= name then
+		player:SetAttribute("ActivityName", name)
+	end
+end
+
 -- Starts a session, interrupting any other one first.
 function Activity.begin(player: Player, id: string, onInterrupt: ((string) -> ())?): Session
 	Activity.interrupt(player, "replaced")
+	if S and S.Encounter and S.Encounter.dismissCard then
+		-- A story card never sits over play: starting an activity puts it off.
+		S.Encounter.dismissCard(player)
+	end
 	local session = { id = id, startedAt = os.clock(), data = {}, onInterrupt = onInterrupt }
 	sessions[player] = session
+	mirror(player)
 	return session
 end
 
@@ -89,6 +119,7 @@ end
 function Activity.finish(player: Player, session: Session?)
 	if session == nil or sessions[player] == session then
 		sessions[player] = nil
+		mirror(player)
 	end
 end
 
@@ -99,6 +130,7 @@ function Activity.interrupt(player: Player, reason: string, expectedSession: Ses
 		return
 	end
 	sessions[player] = nil
+	mirror(player)
 	if session.onInterrupt then
 		local ok, err = pcall(session.onInterrupt, reason)
 		if not ok then
@@ -108,6 +140,9 @@ function Activity.interrupt(player: Player, reason: string, expectedSession: Ses
 end
 
 -- Pays rewards for a completed activity. Only server mechanics call this.
+-- data (optional): timeSeconds (medals, best time) and rating (an integer
+-- 1-3, e.g. trail stars or spa shine; kept as bestRating). An invalid
+-- rating is ignored rather than stored.
 function Activity.complete(player: Player, id: string, data: { [string]: any }?)
 	local def = Definitions[id]
 	local profile = S.Data.get(player)
@@ -120,6 +155,11 @@ function Activity.complete(player: Player, id: string, data: { [string]: any }?)
 	if seconds and (record.best == nil or seconds < record.best) then
 		record.best = seconds
 	end
+	local rating = data and data.rating
+	if not Ratings.isValid(rating) then
+		rating = nil
+	end
+	record.bestRating = Ratings.best(record.bestRating, rating)
 	profile.activities[id] = record
 
 	local coins = 0
@@ -159,7 +199,7 @@ function Activity.complete(player: Player, id: string, data: { [string]: any }?)
 	S.Pet.react(player, "happy")
 	S.Net.push(player, Remotes.PushKinds.Celebrate, {
 		title = `{def.name} complete!`,
-		subtitle = medal and `{medal.label} time!` or nil,
+		subtitle = medal and `{medal.label} time!` or (rating and Ratings.label(rating)) or nil,
 		coins = coins > 0 and coins or nil,
 	})
 	EventBus.publish("activity.completed", player, {
@@ -167,6 +207,7 @@ function Activity.complete(player: Player, id: string, data: { [string]: any }?)
 		count = record.count,
 		timeSeconds = seconds,
 		medal = medal and medal.id or nil,
+		rating = rating,
 	})
 	S.Data.pushState(player)
 end
@@ -204,6 +245,29 @@ function Activity.start()
 		Activity.interrupt(player, "cancelled")
 		return true
 	end, 0.3)
+	-- Dying (or respawning) ends whatever the player was doing; each
+	-- mechanic cleans up through its onInterrupt.
+	local function watch(player: Player)
+		local function onCharacter(character: Model)
+			local humanoid = character:WaitForChild("Humanoid", 10)
+			if humanoid and humanoid:IsA("Humanoid") then
+				humanoid.Died:Connect(function()
+					Activity.interrupt(player, "died")
+				end)
+			end
+		end
+		player.CharacterAdded:Connect(onCharacter)
+		player.CharacterRemoving:Connect(function()
+			Activity.interrupt(player, "died")
+		end)
+		if player.Character then
+			task.spawn(onCharacter, player.Character)
+		end
+	end
+	Players.PlayerAdded:Connect(watch)
+	for _, player in Players:GetPlayers() do
+		watch(player)
+	end
 	Players.PlayerRemoving:Connect(function(player)
 		Activity.interrupt(player, "left")
 		lastPaid[player] = nil

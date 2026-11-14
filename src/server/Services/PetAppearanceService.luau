@@ -55,24 +55,32 @@ function Appearance.applyPet(model: Model, pet: ProfileSchema.PetInstance, owner
 	-- Leash: a beam from the owner's hand to the collar.
 	local leash = visualFor(pet.equipped.leash)
 	if leash and owner then
-		local hand = owner:FindFirstChild("RightGripAttachment", true)
-		local collar = model:FindFirstChild("CollarAttachment", true)
-		if hand and collar then
-			local beam = Instance.new("Beam")
-			beam.Name = "Leash"
-			beam.Attachment0 = hand :: Attachment
-			beam.Attachment1 = collar :: Attachment
-			beam.Color = ColorSequence.new(leash.color)
-			beam.Width0 = 0.15
-			beam.Width1 = 0.15
-			beam.CurveSize0 = -1.5
-			beam.CurveSize1 = 1.5
-			beam.Segments = 12
-			beam.FaceCamera = true
-			beam.LightInfluence = 0
-			beam.Parent = model
-		end
+		Appearance.leash(model, owner, leash.color, "Leash")
 	end
+end
+
+-- A leash beam from the owner's hand to the dog's collar (the equipped
+-- leash cosmetic, and the Trail Walk's clip-on leash). Returns the beam.
+function Appearance.leash(model: Model, owner: Model, color: Color3, name: string): Beam?
+	local hand = owner:FindFirstChild("RightGripAttachment", true)
+	local collar = model:FindFirstChild("CollarAttachment", true)
+	if not hand or not collar then
+		return nil
+	end
+	local beam = Instance.new("Beam")
+	beam.Name = name
+	beam.Attachment0 = hand :: Attachment
+	beam.Attachment1 = collar :: Attachment
+	beam.Color = ColorSequence.new(color)
+	beam.Width0 = 0.15
+	beam.Width1 = 0.15
+	beam.CurveSize0 = -1.5
+	beam.CurveSize1 = 1.5
+	beam.Segments = 12
+	beam.FaceCamera = true
+	beam.LightInfluence = 0
+	beam.Parent = model
+	return beam
 end
 
 function Appearance.applyPlayer(character: Model, profile: ProfileSchema.Profile)

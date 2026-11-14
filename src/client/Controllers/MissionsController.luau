@@ -84,6 +84,9 @@ function Missions.close()
 end
 
 function Missions.start(gui: ScreenGui)
+	task.defer(function()
+		require(script.Parent.PanelCoordinator).track("missions", overlay, Missions.close)
+	end)
 	overlay = new("Frame", {
 		Name = "Missions",
 		Size = UDim2.fromScale(1, 1),

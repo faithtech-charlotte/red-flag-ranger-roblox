@@ -75,8 +75,8 @@ local rigs: { [Model]: Rig } = {}
 local petting = { active = false, intensity = 0, side = 0, scratch = 0 }
 
 local MOOD_SECONDS = 1.8
-local MOOD_ICON = { happy = "⭐", love = "❤️", sparkle = "✨", comfort = "💙", confused = "❓" }
-local WOOF = { excited = "Woof!", happy = "Arf!", love = "♥", confused = "...?", alert = "!" }
+local MOOD_ICON = { happy = "⭐", love = "❤️", sparkle = "✨", comfort = "💙", confused = "❓", sniff = "👃", shake = "💦" }
+local WOOF = { excited = "Woof!", happy = "Arf!", love = "♥", confused = "...?", alert = "!", sniff = "sniff sniff" }
 
 local IDLE_MOVES = {
 	{ name = "tilt", weight = 3, duration = 1.3 },
@@ -719,6 +719,15 @@ local function animate(rig: Rig, dt: number)
 		elseif mood == "confused" then
 			headRoll = 0.4
 			wag = 3
+		elseif mood == "shake" then
+			-- Shaking off after the spa: a fast whole-body wiggle.
+			local k = math.clamp(1 - (now - moodAt) / 1.2, 0, 1)
+			bodyRoll += math.sin(t * 38) * 0.3 * k
+			headRoll += math.sin(t * 38 + 0.6) * 0.45 * k
+			wag = 30
+		elseif mood == "sniff" then
+			headPitch = -0.45 + math.sin(t * 18) * 0.06
+			lookWeight = 0
 		end
 	end
 

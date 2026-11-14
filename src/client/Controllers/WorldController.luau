@@ -3,8 +3,11 @@
 
 	* Waypoint arrow: a glowing beam from you to where your next objective is
 	  (or to the Ranger Station when help was asked for).
-	* Blocked NPCs disappear for you only (the server also refuses to start
-	  conversations with them).
+	* One NPC visibility rule (plan change 12): an NPC is hidden for you if
+	  you blocked it OR it is a story-only character your story doesn't have
+	  present right now. Toggling either alone can't reveal a hidden NPC.
+	  The server also refuses conversations with both.
+	* Sparkz_Pup's dog: a client-only copy of your own breed (StoryDog).
 	* Fetch button (in the Dog Park) and agility timer.
 	* Wrap-around edges: walking off the map puts you on the opposite side.
 ]]
@@ -20,6 +23,7 @@ local QuestCatalog = require(ReplicatedStorage.Shared.Catalogs.QuestCatalog)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local WorldBounds = require(ReplicatedStorage.Shared.WorldBounds)
 local State = require(script.Parent.State)
+local StoryDog = require(script.Parent.StoryDog)
 local Theme = require(script.Parent.Parent.UI.Theme)
 
 local C = Theme.Colors
@@ -125,10 +129,24 @@ end
 -- Blocked NPCs
 ----------------------------------------------------------------------------
 
+-- The one visibility rule: blocked, or story-only and not present.
+function WorldController.isHidden(npcId: any, storyOnly: boolean, data: any): boolean
+	local blocked = data and data.blocked or {}
+	local present = data and data.present or {}
+	if blocked[npcId] ~= nil then
+		return true
+	end
+	return storyOnly and present[npcId] ~= true
+end
+
 local function applyBlocked()
-	local blocked = State.data and State.data.blocked or {}
+	local data = State.data
 	for _, model in CollectionService:GetTagged("Interactable_NPC") do
-		local hidden = blocked[model:GetAttribute("NpcId")] ~= nil
+		local npcId = model:GetAttribute("NpcId")
+		local hidden = WorldController.isHidden(npcId, model:GetAttribute("StoryOnly") == true, data)
+		if model:IsA("Model") and model:GetAttribute("CompanionDog") == true then
+			StoryDog.update(model, not hidden, data and data.pet and data.pet.breedId)
+		end
 		for _, d in model:GetDescendants() do
 			if d:IsA("BasePart") then
 				d.LocalTransparencyModifier = hidden and 1 or 0
@@ -264,7 +282,8 @@ function WorldController.start(gui: ScreenGui, controllers)
 
 	State.push:Connect(function(kind, payload)
 		if kind == Remotes.PushKinds.Waypoint then
-			override = { placeId = payload.placeId, untilTime = os.clock() + 90 }
+			local seconds = if typeof(payload.seconds) == "number" then math.clamp(payload.seconds, 1, 300) else 90
+			override = { placeId = payload.placeId, untilTime = os.clock() + seconds }
 		elseif kind == Remotes.PushKinds.Agility then
 			if payload.state == "running" then
 				if payload.ring == 0 or not agilityRun then
@@ -272,6 +291,9 @@ function WorldController.start(gui: ScreenGui, controllers)
 				else
 					agilityRun.ring = payload.ring
 				end
+			elseif payload.state == "cancelled" then
+				agilityRun = nil
+				agilityLabel.Visible = false
 			elseif payload.state == "finished" then
 				agilityRun = nil
 				agilityLabel.Text = `Finished in {payload.time}s!`
