@@ -167,6 +167,9 @@ end
 
 -- Exactly one exit event per session.
 publishExit = function(player: Player, session: Session, kind: string, outcome: string?)
+	if session.exited then
+		return
+	end
 	session.exited = true
 	do
 		local facts = {}
@@ -374,8 +377,14 @@ local function close(player: Player, payload: any): (boolean, string?)
 	local node = enc.nodes[session.nodeId]
 	if node.speaker == "tip" then
 		-- Closing a tip card = its first choice (keeps the outcome recorded).
+		-- A forced close (another panel took over) must not move on to a
+		-- further node, which would reopen the conversation.
 		local first = node.choices[1]
-		return choose(player, { sessionId = session.id, rev = session.rev, choiceId = first.id })
+		if payload.force ~= true or first.next == nil then
+			return choose(player, { sessionId = session.id, rev = session.rev, choiceId = first.id })
+		end
+		endSession(player, "walk_away")
+		return true
 	end
 	if enc.onWalkAway and session.nodeId ~= enc.onWalkAway and payload.force ~= true then
 		session.nodeId = enc.onWalkAway
@@ -389,6 +398,11 @@ end
 local function safety(player: Player, payload: any): (boolean, string?)
 	local session = validSession(player, payload)
 	if not session then
+		return false, nil
+	end
+	-- One safety tool per scene: once its feedback card is showing (and its
+	-- exit published), further tool requests are refused.
+	if session.feedback or session.exited then
 		return false, nil
 	end
 	local tool = payload.tool

@@ -152,8 +152,12 @@ local function tick()
 			-- Real play only: moving, or a request the player actually made.
 			-- An open panel alone (auto-renewed) does not count.
 			local acted = S.Net.lastActedAt(player)
-			if moved or (acted and now - acted <= IDLE_SECONDS) then
+			-- Keep the real timestamp of the last action, so one request
+			-- counts for at most IDLE_SECONDS of play.
+			if moved then
 				lastActive[player] = now
+			elseif acted and acted > (lastActive[player] or 0) then
+				lastActive[player] = acted
 			end
 			if lastActive[player] and now - lastActive[player] <= IDLE_SECONDS then
 				local campaign = profile.campaign
