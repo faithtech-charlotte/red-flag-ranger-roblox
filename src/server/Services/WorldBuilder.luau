@@ -185,13 +185,14 @@ local function building(parent: Instance, name: string, center: Vector3, size: V
 		end
 	end
 	block(m, "Roof", Vector3.new(size.X + 3, 1, size.Z + 3), center.X, h, center.Z, roofColor)
-	-- Ceiling lights so interiors stay bright and welcoming.
+	-- Ceiling lights so interiors stay warm and welcoming. Kept soft because
+	-- six of them overlap in each room.
 	for lx = -1, 1 do
 		for lz = -1, 1, 2 do
-			local lamp = block(m, "CeilingLight", Vector3.new(3, 0.3, 3), center.X + lx * size.X / 3.2, h - 0.3, center.Z + lz * size.Z / 4.5, C.white, { Material = Enum.Material.Neon })
+			local lamp = block(m, "CeilingLight", Vector3.new(3, 0.3, 3), center.X + lx * size.X / 3.2, h - 0.3, center.Z + lz * size.Z / 4.5, Color3.fromRGB(255, 240, 215), { Material = Enum.Material.Neon })
 			local light = Instance.new("PointLight")
 			light.Range = 18
-			light.Brightness = 0.5
+			light.Brightness = 0.9
 			light.Color = Color3.fromRGB(255, 244, 225)
 			light.Parent = lamp
 		end
@@ -548,7 +549,19 @@ local function scatter(parent: Instance, rng: Random)
 	end
 end
 
+-- Single source of truth for world lighting. Keep default.project.json's
+-- Lighting block in sync so Studio edit mode matches what players see.
+-- (Lighting.Technology can't be set from scripts; it lives in the project file.)
+local function applyLighting()
+	Lighting.ClockTime = 13
+	Lighting.Brightness = 2
+	Lighting.ExposureCompensation = -0.15
+	Lighting.OutdoorAmbient = Color3.fromRGB(120, 120, 130)
+	Lighting.Ambient = Color3.fromRGB(40, 40, 48)
+end
+
 function World.init(_services)
+	applyLighting()
 	local existing = workspace:FindFirstChild("World")
 	if existing then
 		root = existing :: Model
@@ -573,11 +586,6 @@ function World.init(_services)
 		baseplate.Color = C.grass
 		baseplate.Material = Enum.Material.Grass
 	end
-	Lighting.ClockTime = 14
-	Lighting.Brightness = 2.5
-	Lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 165)
-	Lighting.Ambient = Color3.fromRGB(90, 90, 100)
-
 	local rng = Random.new(7)
 	buildPaths(root)
 	buildPetStore(root)
