@@ -74,6 +74,14 @@ The owner wants to see options before anything is built, starting with the contr
 | Walking through the dog | Solid to players only, **and** he sidesteps when you walk into him | Solid only (can wedge or block doorways) | Sidestep only, never solid (may still clip at sprint speed) | A |
 | Shadow | Soft blob shadow under the dog (cheap, cartoony, changes nothing else) | Switch the whole game to ShadowMap lighting (crisper shadows everywhere; changes the overall and indoor look; costs performance on phones) | | A |
 
+## Session 3 (2026-11-14): jumping obstacles
+
+- **Player:** benches, fences and hurdles were already collidable but low enough to step over. `WorldBuilder` now adds invisible `PlayerBlocker` walls (3.2 to 3.4 studs, collision group `PlayerBlocker`, collides with `Characters` only), so the player has to jump them.
+- **Dog:** the visible parts are tagged `JumpObstacle`. `PetController` lifts the dog's body over them using `Shared/ObstacleHop` (animation only: the root stays on the ground, on every client). Ground and aim raycasts exclude both tags, so the follow target no longer climbs onto benches and rails.
+- **Not played yet.** The code was written without a Studio session; only `rojo build` was run. Check: `ObstacleHop.spec` passes; you are stopped by and can jump each obstacle; the dog hops when crossing and not when running alongside a fence; the fetch ball ignores blockers; agility medal times still feel fair now that hurdles need a jump; touch auto-jump on blockers.
+- **Dog sinking when you jump:** the follow target rides your character during the physics step, so the dog rose with a jump and dipped under the floor on the way down. `PetController.keepOnGround` now puts a Following/Returning dog back on the ground under its own feet after every physics step (owner client only). Not played yet.
+- A hand-built `Workspace.World` needs its own tags and blockers. Trees, lamp posts, weave poles and buildings are unchanged (the dog still passes through them).
+
 ## How to work in Studio (important)
 
 - Rojo isn't installed. Use `tools/studio-sync/` (see its README): build `manifest.json`, serve it on port 34999, stop Play, then run `sync.luau` through the Studio MCP `execute_luau` tool in Edit mode.
