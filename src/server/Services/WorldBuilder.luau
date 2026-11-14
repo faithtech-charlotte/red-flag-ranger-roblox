@@ -220,10 +220,15 @@ local function building(parent: Instance, name: string, center: Vector3, size: V
 		end
 	end
 	block(m, "Roof", Vector3.new(size.X + 3, 1, size.Z + 3), center.X, h, center.Z, roofColor)
-	-- Ceiling lights so interiors stay warm and welcoming. Kept soft because
-	-- six of them overlap in each room.
-	for lx = -1, 1 do
-		for lz = -1, 1, 2 do
+	-- Ceiling lights so interiors stay warm and welcoming. The lamp count
+	-- scales with floor size (about one per 16x16 studs, the pet store's 3x2
+	-- grid) so small rooms aren't washed out by six overlapping lights.
+	local cols = math.clamp(math.round(size.X / 16), 1, 3)
+	local rows = math.clamp(math.round(size.Z / 16), 1, 2)
+	for ix = 1, cols do
+		for iz = 1, rows do
+			local lx = ix - (cols + 1) / 2
+			local lz = (iz - (rows + 1) / 2) * 2
 			local lamp = block(m, "CeilingLight", Vector3.new(3, 0.3, 3), center.X + lx * size.X / 3.2, h - 0.3, center.Z + lz * size.Z / 4.5, Color3.fromRGB(255, 240, 215), { Material = Enum.Material.Neon })
 			local light = Instance.new("PointLight")
 			light.Range = 18
