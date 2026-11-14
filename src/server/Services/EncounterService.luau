@@ -40,6 +40,8 @@ type Session = {
 	arcId: string?,
 	nodeId: string?,
 	feedback: { text: string, outcome: string, complete: boolean }?,
+	rev: number, -- bumped on every node sent; requests must echo it
+	facts: { [string]: boolean }, -- facts presented so far in this session
 }
 
 local Encounter = {}
@@ -97,12 +99,34 @@ local function send(player: Player)
 	local npcDef = Content.npcs[session.npcId]
 	local node = currentNode(player, session)
 	local v = vars(player, npcDef)
+	session.rev += 1
+	-- Facts are recorded when the node that presents them is shown, never
+	-- for nodes the player didn't see. Tip/feedback text adds no facts.
+	local authored = session.enc and not session.feedback and session.enc.nodes[session.nodeId]
+	if authored and authored.facts then
+		local fresh = {}
+		for _, fact in authored.facts do
+			if not session.facts[fact] then
+				session.facts[fact] = true
+				table.insert(fresh, fact)
+			end
+		end
+		if #fresh > 0 then
+			EventBus.publish("encounter.facts_presented", player, {
+				encounterId = session.enc.id,
+				npcId = session.npcId,
+				nodeId = session.nodeId,
+				facts = fresh,
+			})
+		end
+	end
 	local choices = {}
 	for _, c in node.choices do
 		table.insert(choices, { id = c.id, text = EncounterEngine.format(c.text, v) })
 	end
 	S.Net.push(player, Remotes.PushKinds.Dialogue, {
 		sessionId = session.id,
+		rev = session.rev,
 		npcId = session.npcId,
 		npcName = npcDef.displayName,
 		subtitle = npcDef.subtitle,
@@ -113,16 +137,45 @@ local function send(player: Player)
 	})
 end
 
-local function endSession(player: Player)
-	if sessions[player] then
-		sessions[player] = nil
+-- Every way a conversation can end goes through here, with a kind:
+--   completed   the graph reached an outcome (outcome given)
+--   walk_away   the player closed the panel or walked out of range
+--   help        Help preempted it
+--   blocked / reported   a practice safety tool, after its feedback card
+--   replaced    another conversation started
+--   respawn / disconnect
+-- The exit event carries the facts this session presented, so listeners
+-- (story progress) can tell "left before anything concerning" from "left
+-- after a concerning request" without guessing.
+local function endSession(player: Player, kind: string?, outcome: string?)
+	local session = sessions[player]
+	if not session then
+		return
+	end
+	sessions[player] = nil
+	if player.Parent then
 		S.Net.push(player, Remotes.PushKinds.DialogueClose)
+	end
+	if session.enc then
+		local facts = {}
+		for fact in session.facts do
+			table.insert(facts, fact)
+		end
+		EventBus.publish("encounter.exited", player, {
+			encounterId = session.enc.id,
+			npcId = session.npcId,
+			arcId = session.arcId,
+			nodeId = session.nodeId,
+			kind = kind or "walk_away",
+			outcome = outcome,
+			facts = facts,
+		})
 	end
 end
 
 local function finish(player: Player, outcome: string)
 	local session = sessions[player]
-	endSession(player)
+	endSession(player, "completed", outcome)
 	if not session or not session.enc then
 		return
 	end
@@ -159,9 +212,11 @@ local function begin(player: Player, npcId: string, model: Model?, locationId: s
 		S.Net.toast(player, `You blocked {npcDef.displayName}. You can unblock them from the Help menu.`, "info")
 		return
 	end
-	endSession(player)
+	endSession(player, "replaced")
 	nextSessionId += 1
 	sessions[player] = {
+		rev = 0,
+		facts = {},
 		id = nextSessionId,
 		npcId = npcId,
 		model = model,
@@ -174,13 +229,17 @@ local function begin(player: Player, npcId: string, model: Model?, locationId: s
 	send(player)
 end
 
--- Opens Ranger Lee's help conversation from anywhere. Never gated.
 -- True while the player is in any conversation or Help scene.
 function Encounter.isActive(player: Player): boolean
 	return sessions[player] ~= nil
 end
 
+-- Opens Ranger Lee's help conversation from anywhere. Never gated. Help
+-- preempts whatever conversation is open; that scene ends with exit kind
+-- "help", and the facts it already presented go with the exit event, so
+-- the story keeps its context (what was seen) and Lee can respond to it.
 function Encounter.startHelp(player: Player)
+	endSession(player, "help")
 	local profile = S.Data.get(player)
 	if profile then
 		profile.learning.toolsPracticed.help = true
@@ -201,7 +260,7 @@ function Encounter.interact(player: Player, model: Model)
 		return
 	end
 	if npcDef.interaction == "shop" then
-		endSession(player)
+		endSession(player, "replaced")
 		S.Net.push(player, Remotes.PushKinds.OpenShop, {
 			npcName = npcDef.displayName,
 			line = npcDef.idleLine,
@@ -210,7 +269,7 @@ function Encounter.interact(player: Player, model: Model)
 		return
 	end
 	if npcDef.interaction == "adopt" and not profile.activePetId then
-		endSession(player)
+		endSession(player, "replaced")
 		S.Net.push(player, Remotes.PushKinds.OpenAdoption)
 		return
 	end
@@ -222,8 +281,12 @@ local function validSession(player: Player, payload: any): Session?
 	if not session or typeof(payload) ~= "table" or payload.sessionId ~= session.id then
 		return nil
 	end
+	-- A request for an earlier node of this same conversation is stale.
+	if payload.rev ~= session.rev then
+		return nil
+	end
 	if not session.remote and session.model and not S.NPC.isNear(player, session.model, WALK_AWAY_DISTANCE) then
-		endSession(player)
+		endSession(player, "walk_away")
 		return nil
 	end
 	return session
@@ -244,7 +307,7 @@ local function choose(player: Player, payload: any): (boolean, string?)
 		if fb.complete then
 			finish(player, fb.outcome)
 		else
-			endSession(player)
+			endSession(player, fb.outcome)
 		end
 		if choiceId == "help" then
 			Encounter.startHelp(player)
@@ -288,24 +351,26 @@ local function close(player: Player, payload: any): (boolean, string?)
 	end
 	local session = validSession(player, payload)
 	if not session then
-		return true -- validSession already ended it (walked away)
+		-- Either a stale request for an older node (ignored) or the player
+		-- walked out of range (validSession already ended it).
+		return true
 	end
 	if session.feedback or not session.enc then
-		return choose(player, { sessionId = session.id, choiceId = "ok" })
+		return choose(player, { sessionId = session.id, rev = session.rev, choiceId = "ok" })
 	end
 	local enc = session.enc
 	local node = enc.nodes[session.nodeId]
 	if node.speaker == "tip" then
 		-- Closing a tip card = its first choice (keeps the outcome recorded).
 		local first = node.choices[1]
-		return choose(player, { sessionId = session.id, choiceId = first.id })
+		return choose(player, { sessionId = session.id, rev = session.rev, choiceId = first.id })
 	end
 	if enc.onWalkAway and session.nodeId ~= enc.onWalkAway then
 		session.nodeId = enc.onWalkAway
 		send(player)
 		return true
 	end
-	endSession(player)
+	endSession(player, "walk_away")
 	return true
 end
 
@@ -322,10 +387,8 @@ local function safety(player: Player, payload: any): (boolean, string?)
 	if tool == "help" then
 		if completes then
 			finish(player, "sought_help")
-		else
-			endSession(player)
 		end
-		Encounter.startHelp(player)
+		Encounter.startHelp(player) -- ends any remaining scene with kind "help"
 		return true
 	end
 	if npcDef.role ~= "peer" or (tool ~= "block" and tool ~= "report") then
@@ -333,6 +396,15 @@ local function safety(player: Player, payload: any): (boolean, string?)
 	end
 	local action = tool == "block" and "simulate_block" or "simulate_report"
 	ActionService.run(player, { { action = action, npcId = session.npcId } }, { npcId = session.npcId })
+	-- Published before the feedback card shows, so the choice is recorded
+	-- even if the player disconnects while reading it.
+	if enc then
+		EventBus.publish("encounter.safety_tool", player, {
+			encounterId = enc.id,
+			npcId = session.npcId,
+			tool = tool,
+		})
+	end
 	session.feedback = {
 		text = EncounterEngine.format(Content.safetyFeedback[tool], vars(player, npcDef)),
 		outcome = tool == "block" and "blocked" or "reported",
@@ -440,8 +512,20 @@ function Encounter.start()
 	end, 0.5)
 
 	Players.PlayerRemoving:Connect(function(player)
-		sessions[player] = nil
+		endSession(player, "disconnect")
 	end)
+	local function watchRespawn(player: Player)
+		player.CharacterAdded:Connect(function()
+			local session = sessions[player]
+			if session and not session.remote then
+				endSession(player, "respawn")
+			end
+		end)
+	end
+	Players.PlayerAdded:Connect(watchRespawn)
+	for _, player in Players:GetPlayers() do
+		watchRespawn(player)
+	end
 end
 
 return Encounter

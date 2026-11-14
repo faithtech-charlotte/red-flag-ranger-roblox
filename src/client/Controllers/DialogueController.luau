@@ -37,6 +37,9 @@ local function send(kind: string, payload: any)
 	if waiting then
 		return
 	end
+	if typeof(payload) == "table" and current then
+		payload.rev = current.rev -- the server rejects requests for an older node
+	end
 	waiting = true
 	local ok, err = State.request(kind, payload)
 	waiting = false
