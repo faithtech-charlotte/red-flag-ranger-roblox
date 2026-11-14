@@ -112,7 +112,13 @@ local function makeTool(player: Player)
 	tool.ToolTip = "Hold to wind up, release to throw! Aim higher for a floatier throw."
 	tool.CanBeDropped = false
 	tool.RequiresHandle = true
-	tool.Grip = CFrame.new(0, -0.2, -0.6) * CFrame.Angles(0, 0, math.rad(90))
+	-- Held flat by the rim, like a backhand grip. Grip's position is where the
+	-- hand sits in the handle's own space: the cylinder's round faces are on
+	-- its X axis, and its +Z points back toward the arm, so (0, 0, r) is the
+	-- rim nearest the hand. Just inside the radius (0.9) so the rim sits in
+	-- the palm instead of the hand going through the middle of the disc.
+	-- The rotation lays the disc flat (handle X = down) in the tool-hold pose.
+	tool.Grip = CFrame.new(0.05, 0, 0.82) * CFrame.Angles(0, 0, math.rad(90))
 	tool:SetAttribute("InHand", true)
 	local handle = Instance.new("Part")
 	handle.Name = "Handle"
@@ -439,8 +445,11 @@ local function runThrow(player: Player, match: Game, launch: FrisbeeMath.Launch,
 	-- Grab it.
 	local mouth = pet.model:FindFirstChild("MouthAttachment", true) :: Attachment?
 	if mouth then
+		-- Flat, rim in the jaws: the mouth attachment has the head's axes (-Z
+		-- forward, Y up), so turn the cylinder's face axis (X) to point up and
+		-- push the disc forward by a bit less than its radius (0.825).
 		disc.Size = DISC_SIZE * 0.75
-		disc.CFrame = mouth.WorldCFrame * CFrame.new(0, -0.1, -0.7)
+		disc.CFrame = mouth.WorldCFrame * CFrame.new(0, -0.05, -0.65) * CFrame.Angles(0, 0, math.rad(90))
 		local w = Instance.new("WeldConstraint")
 		w.Part0 = mouth.Parent :: BasePart
 		w.Part1 = disc
