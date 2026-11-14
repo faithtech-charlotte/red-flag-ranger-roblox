@@ -58,6 +58,18 @@ New: `Content/Campaign/{Facts,Shared,Onboarding,Sparkz,Healthy,Cara,Lee,Roleplay
 14. Jordan: only his idle line.
 15. Lee general menu after E2: Help → "Something happened in a park story." → moments/facts.
 
+### Service-level checks (Codex review: no EncounterService test harness, so these run in Studio)
+
+16. Out-of-range Help: walk up to Sparkz during E2, walk 30+ studs away with the panel open, press Ask Lee for help. Expect Lee's contextual menu for E2, not a silent close.
+17. Stale request: answer a node, then resend the previous node's choice (old rev). Expect it ignored; Help with an old rev but the current session still works; Help naming an older session does nothing.
+18. HUD Help cancels the follow-up: during E2 open HUD 💙 Help → Talk to Ranger Lee, finish with Lee within 60 s. Expect no "Cara waves." card afterwards.
+19. Help from Cara's follow-up card: leave E2 after the school question, press Ask Lee for help on "Cara waves." within 60 s. Expect Lee's contextual menu for E2.
+20. Remote Help during Cara's walk: accept "Let's talk to Lee together", press Help on the way, finish with Lee, then enter Ranger HQ within 180 s. Expect no second Lee menu.
+21. Walk arrival with a panel open: accept the walk, open the journal, walk into Ranger HQ. Expect Lee waits until the journal closes.
+22. Reflection: E2 → Something feels off → wrong answer → Back. Expect Something feels off gone from the bar; no Recognize credit.
+23. Roleplay recovery: rp_e2_deal → agree → retry → refuse → no deal → continue. Expect the debrief's retry text (`agreed_retry_ok`).
+24. Card over play: with an invitation card open, start a Trail Walk. Expect the card closes (interrupted) and returns only after another activity and the gap.
+
 ## Not done
 
 - Cara doesn't physically walk to Lee (waypoint only).

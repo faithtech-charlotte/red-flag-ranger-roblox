@@ -704,7 +704,10 @@ function Encounter.startHelp(player: Player)
 	local story = session and session.story
 	local beat = story and story.concern and story.creditBeat or nil
 	local recent = recentConcern[player]
-	if not beat and not session and recent and os.clock() - recent.at <= RECENT_SECONDS then
+	-- No scene (HUD Help) or only a card (invitation / Cara's follow-up):
+	-- the recent concerning beat still sets Lee's context.
+	local noScene = session == nil or session.kind == "card"
+	if not beat and noScene and recent and os.clock() - recent.at <= RECENT_SECONDS then
 		beat = recent.beat
 	end
 	recentConcern[player] = nil
