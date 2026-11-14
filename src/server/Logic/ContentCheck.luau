@@ -313,7 +313,7 @@ function ContentCheck.checkMetadata(problems, id: string, enc, content)
 	end
 	local ts = enc.targetSeconds
 	if typeof(ts) ~= "table" or typeof(ts[1]) ~= "number" or typeof(ts[2]) ~= "number" or ts[1] > ts[2] then
-		table.insert(problems, `{where}: targetSeconds must be { min, max }`)
+		table.insert(problems, `{where}: targetSeconds must be \{ min, max }`)
 	end
 	if (enc.sceneKind == "beat" or enc.sceneKind == "healthy" or enc.sceneKind == "ambient")
 		and (typeof(enc.invitation) ~= "table" or typeof(enc.invitation.text) ~= "string")
