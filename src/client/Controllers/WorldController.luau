@@ -6,6 +6,7 @@
 	* Blocked NPCs disappear for you only (the server also refuses to start
 	  conversations with them).
 	* Fetch button (in the Dog Park) and agility timer.
+	* Wrap-around edges: walking off the map puts you on the opposite side.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -17,6 +18,7 @@ local UserInputService = game:GetService("UserInputService")
 local Places = require(ReplicatedStorage.Shared.Places)
 local QuestCatalog = require(ReplicatedStorage.Shared.Catalogs.QuestCatalog)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local WorldBounds = require(ReplicatedStorage.Shared.WorldBounds)
 local State = require(script.Parent.State)
 local Theme = require(script.Parent.Parent.UI.Theme)
 
@@ -206,6 +208,20 @@ local function updateActivityUI()
 	end
 end
 
+-- The client owns its character's physics, so wrapping here is instant and
+-- smooth. Rotation and velocity are kept so running carries straight through.
+local function wrapCharacter()
+	local character = player.Character
+	local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not hrp then
+		return
+	end
+	local wrapped = WorldBounds.wrap(hrp.Position)
+	if wrapped then
+		character:PivotTo(CFrame.new(wrapped) * hrp.CFrame.Rotation)
+	end
+end
+
 function WorldController.start(gui: ScreenGui, controllers)
 	hud = controllers.HUD
 	dialogue = controllers.Dialogue
@@ -251,6 +267,7 @@ function WorldController.start(gui: ScreenGui, controllers)
 
 	local acc = 0
 	RunService.Heartbeat:Connect(function(dt)
+		wrapCharacter()
 		acc += dt
 		if acc >= 0.1 then
 			acc = 0
