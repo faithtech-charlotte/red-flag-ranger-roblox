@@ -129,7 +129,16 @@ Run D:
 | 5 | Pass: [Share my school] → Cara's pause card → Let me try again → refuse → No deal → (Keep playing) → "Cara waves." → "Thanks for trying that again." |
 | 20 | Pass: "Let's talk to Lee together" → HUD Help on the way (Lee's menu: school, town, coins) → done → 6 s inside Ranger HQ, no second Lee |
 
-Not run yet: 7 (live), 8. 10 is not observable on the client (covered by tests).
+Run E:
+
+| # | Result |
+|---|---|
+| 7 | Pass: Block at E2's first node → "You blocked Sparkz_Pup in this game..." → Sparkz hidden, prompt disabled; Cara's follow-up "You blocked Sparkz." (later beats skipped_by_block is covered by tests; no later beat in this build) |
+| 8 | Pass: Cara blocked and hidden; Help → "Can I practice a park story?" → "The school question" → "Ranger Lee (pretending)"; Leave → Lee's debrief |
+
+**Checklist complete** except 10 (not observable on the client; covered by tests).
+
+Content notes for the script review: when Lee runs the roleplay, the pretend node still offers "I'm going to ask Lee." and the bar shows Ask Lee for help, and the debrief offers "Can I practice telling Lee?" to Lee himself. 10 is not observable on the client (covered by tests).
 
 Also seen: the Help popup's close button shows an empty square (missing glyph). 10 is not observable on the client (covered by tests).
 

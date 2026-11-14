@@ -2,6 +2,15 @@
 
 Read `CLAUDE.md`, then `docs/implementation-plan.md` (r3, Codex-approved; source of truth for phases and decisions), then this, then `docs/phase2-notes.md`.
 
+## Session 5 (2026-11-14): Phase 2 verified, PR open
+
+- Branch pushed as `feat/interaction-expansion`; **draft PR #14** into `main`. `main` (frisbee field, jump obstacles, roblox skill) merged in at 41e72dd.
+- Tests 275/275. Codex Phase 2 review APPROVE after 4 rounds. Track B checklist and the whole Phase 2 Studio checklist pass (results and found issues in `docs/phase2-notes.md`).
+- Fixed in Studio: ContentCheck brace, Codex folds, story card closes when an activity starts, Sparkz moved away from the squeaky duck (its prompt stole E).
+- Open, small: Rinse 💧 and the Help popup's close button render as empty boxes; Riley's card has no label; Lee-narrated roleplay lines mention asking Lee; spa via Hold Space is an easy 3 stars; the real Space-key squirrel hold is unconfirmed by hand.
+- Studio MCP: if tools vanish, stale `StudioMCP` processes from other sessions hold the connection; ending them (owner approved) restored it. Codex MCP was down; `~/.local/bin/codex exec -s read-only` works directly.
+- Next: owner's feel playtest (Track B) and Studio check (Phase 2); then Phase 3 leftovers and Phase 4.
+
 ## Rules from the owner
 
 - Additive changes unless a requirement needs a new abstraction.
