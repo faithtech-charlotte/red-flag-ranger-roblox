@@ -28,6 +28,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
+local ObstacleHop = require(ReplicatedStorage.Shared.ObstacleHop)
 local PetCatalog = require(ReplicatedStorage.Shared.Catalogs.PetCatalog)
 
 local player = Players.LocalPlayer
@@ -64,6 +65,8 @@ type Rig = {
 	track: AnimationTrack?,
 	trackState: string?,
 	nextNomAt: number,
+	hop: number, -- current lift over an obstacle (studs, eased)
+	hopping: boolean,
 }
 
 local rigs: { [Model]: Rig } = {}
@@ -221,6 +224,8 @@ local function track(model: Instance)
 		toyOut = model:GetAttribute("ToyOut") == true,
 		own = model:GetAttribute("OwnerUserId") == player.UserId,
 		nextNomAt = 0,
+		hop = 0,
+		hopping = false,
 	}
 end
 
@@ -345,6 +350,32 @@ end
 --   fetching: run to the spot under the ball, not to the ball in the air
 local groundParams = RaycastParams.new()
 groundParams.FilterType = Enum.RaycastFilterType.Exclude
+-- Ground is something you can stand on: skip trigger volumes and decorations
+-- (the invisible AgilityFinish box is 4 studs tall).
+groundParams.RespectCanCollide = true
+
+-- Boxes the dog hops over (parts tagged JumpObstacle). They are anchored
+-- scenery, so the list is only rebuilt when the tagged set changes.
+local hopBoxes: { ObstacleHop.Box }? = nil
+
+local function obstacleBoxes(): { ObstacleHop.Box }
+	if not hopBoxes then
+		local list = {}
+		for _, p in CollectionService:GetTagged(ObstacleHop.JUMP_TAG) do
+			if p:IsA("BasePart") then
+				table.insert(list, { cf = p.CFrame, size = p.Size })
+			end
+		end
+		hopBoxes = list
+	end
+	return hopBoxes :: { ObstacleHop.Box }
+end
+
+local function resetHopBoxes()
+	hopBoxes = nil
+end
+CollectionService:GetInstanceAddedSignal(ObstacleHop.JUMP_TAG):Connect(resetHopBoxes)
+CollectionService:GetInstanceRemovedSignal(ObstacleHop.JUMP_TAG):Connect(resetHopBoxes)
 
 local function groundY(at: Vector3, extra: Instance?): number?
 	local ignore: { Instance } = { extra :: Instance }
@@ -355,7 +386,19 @@ local function groundY(at: Vector3, extra: Instance?): number?
 	if pets then
 		table.insert(ignore, pets)
 	end
-	groundParams.FilterDescendantsInstances = ignore
+	-- Other players and NPCs aren't ground either: dog parts don't collide, so
+	-- a dog walking through someone would otherwise climb onto them.
+	for _, other in Players:GetPlayers() do
+		if other ~= player and other.Character then
+			table.insert(ignore, other.Character)
+		end
+	end
+	local npcs = workspace:FindFirstChild("NPCs")
+	if npcs then
+		table.insert(ignore, npcs)
+	end
+	-- The target stays on the ground under an obstacle; the dog hops it.
+	groundParams.FilterDescendantsInstances = ObstacleHop.groundIgnore(ignore)
 	local hit = workspace:Raycast(at + Vector3.new(0, 1, 0), Vector3.new(0, -40, 0), groundParams)
 	return hit and hit.Position.Y or nil
 end
@@ -384,6 +427,33 @@ local function groundTargets(rig: Rig, state: string)
 			chase.WorldPosition = Vector3.new(ball.Position.X, g + feet, ball.Position.Z)
 		end
 	end
+end
+
+-- The follow target hangs off your character, so during the physics step it
+-- rides up with a jump and dips below the floor on the way down, dragging the
+-- dog with it. After each step, put a following dog back on the ground under
+-- its own feet: it runs on the ground and never flies or sinks.
+local GROUND_SLACK = 0.1
+
+local function keepOnGround(rig: Rig)
+	local state = rig.model:GetAttribute("PetState") or "Following"
+	if state ~= "Following" and state ~= "Returning" then
+		return
+	end
+	local root = rig.root
+	local g = groundY(root.Position + Vector3.new(0, 1, 0))
+	if not g then
+		return
+	end
+	local want = g + (rig.model:GetAttribute("GroundOffset") or 1.5)
+	local off = root.Position.Y - want
+	if math.abs(off) <= GROUND_SLACK then
+		return
+	end
+	local fix = math.sign(off) * GROUND_SLACK - off
+	root.CFrame += Vector3.new(0, fix, 0)
+	local v = root.AssemblyLinearVelocity
+	root.AssemblyLinearVelocity = Vector3.new(v.X, 0, v.Z)
 end
 
 local function steerOwnDog(rig: Rig, state: string, flatVel: Vector3)
@@ -663,6 +733,23 @@ local function animate(rig: Rig, dt: number)
 		backKick = math.max(backKick, petting.scratch)
 	end
 
+	-- Hop over obstacles in the way. Only the body lifts (everyone animates
+	-- this from the dog's own motion); the root keeps running on the ground.
+	local hopTarget = 0
+	if state ~= "Sitting" and state ~= "Staying" and state ~= "Grooming" then
+		local feetY = rig.root.Position.Y - (model:GetAttribute("GroundOffset") or 1.5)
+		hopTarget = ObstacleHop.height(obstacleBoxes(), rig.root.Position, vel, feetY, rig.hopping)
+	end
+	rig.hopping = hopTarget > 0
+	local hopBefore = rig.hop
+	rig.hop += (hopTarget - rig.hop) * math.min(1, dt * 12)
+	if rig.hop > 0.01 then
+		lift += rig.hop
+		-- Nose up on the way up, down on the way down.
+		bodyPitch -= math.clamp((rig.hop - hopBefore) / math.max(dt, 1e-3) * 0.012, -0.3, 0.3)
+		sitTarget, lieTarget = 0, 0
+	end
+
 	rig.sit += (sitTarget - rig.sit) * math.min(1, dt * 6)
 	rig.lie += (lieTarget - rig.lie) * math.min(1, dt * 2)
 	rig.wagAmp += (wagAmp - rig.wagAmp) * math.min(1, dt * 4)
@@ -740,6 +827,14 @@ function PetController.start()
 				animate(rig, dt)
 			else
 				untrack(model)
+			end
+		end
+	end)
+	-- After physics (we simulate our own dog), before the frame is drawn.
+	RunService.Heartbeat:Connect(function()
+		for model, rig in rigs do
+			if rig.own and model.Parent and rig.root.Parent then
+				keepOnGround(rig)
 			end
 		end
 	end)

@@ -55,7 +55,8 @@ See README.md for the game architecture. Key rules:
 ## Gotchas
 
 - **Raycasts:** `CanQuery = false` is ignored on parts that collide, so exclude such parts (e.g. the fetch ball) explicitly with `RaycastParams`.
-- **Collision groups** `FetchBall` and `Characters` already exist; reuse them rather than adding ad-hoc `CanCollide` toggles.
+- **Collision groups** `FetchBall`, `Characters` and `PlayerBlocker` already exist; reuse them rather than adding ad-hoc `CanCollide` toggles.
+- **Obstacles** (`src/shared/ObstacleHop.luau`): visible parts tagged `JumpObstacle` (benches, fences, hurdles) are hopped by the dog; the hop is animation only (`PetController` lifts the body, the root stays on the ground). Invisible parts tagged `PlayerBlocker` (group `PlayerBlocker`, collides with `Characters` only) stop players stepping over low obstacles so they have to jump. Any new ground or aim raycast must exclude both with `ObstacleHop.groundIgnore`. Ground raycasts also set `RespectCanCollide = true` so invisible trigger volumes (e.g. `AgilityFinish`) don't count as ground.
 - **Lighting:** scripts (including MCP `execute_luau`) cannot read or write `Lighting.Technology`. Currently `Voxel`, and no object casts a visible ground shadow under it; a lighting change is being handled separately.
 - **Sounds:** only built-in `rbxasset://sounds/...` are used (`src/client/UI/Sounds.luau`); custom asset ids go in its `CUSTOM` table.
 - **Studio MCP testing:** `screen_capture` works in Play mode; `user_mouse_input` x/y are GUI coordinates (viewport minus the 58 px top inset); `instance_path` clicks need unique names. Adopt a dog in tests with `ReplicatedStorage.Remotes.Request:InvokeServer("adopt", { breedId = "golden", name = "Sparky" })` from the Client datamodel. Short-lived effects (the 1 s "!" bubble) are easier to verify by inspecting instances than by screenshot.
@@ -64,7 +65,8 @@ See README.md for the game architecture. Key rules:
 
 - **Whistle:** H / gamepad D-pad Up / the 📣 button (above the jump button on touch) calls the dog back from anywhere (`WhistleController`).
 - **Action bar** (bottom-left, `ActionBarController`): Q / gamepad Y. Planned to be replaced by a tap-the-dog ring menu.
-- Planned: the dog becomes solid to players and obstacles, sidesteps when walked into, and jumps agility hurdles.
+- **Jump:** benches, fences and hurdles are solid to the player, who jumps them; the dog hops them by itself.
+- Planned: the dog becomes solid to players and sidesteps when walked into.
 
 ## Docs
 
