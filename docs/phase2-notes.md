@@ -122,7 +122,14 @@ Run B (after the Sparkz move, 275/275 tests):
 | Fix | Pass: Sparkz's Talk prompt shows at (-114, -70); E by walking up starts E1 and E2 |
 | 6, 16 | Pass: E2 started by walking up, walked 33 studs away with the panel open, Ask Lee for help opened Lee's E2 menu |
 
-Not run yet: 5, 7 (live), 8, 20. 10 is not observable on the client (covered by tests).
+Run D:
+
+| # | Result |
+|---|---|
+| 5 | Pass: [Share my school] → Cara's pause card → Let me try again → refuse → No deal → (Keep playing) → "Cara waves." → "Thanks for trying that again." |
+| 20 | Pass: "Let's talk to Lee together" → HUD Help on the way (Lee's menu: school, town, coins) → done → 6 s inside Ranger HQ, no second Lee |
+
+Not run yet: 7 (live), 8. 10 is not observable on the client (covered by tests).
 
 Also seen: the Help popup's close button shows an empty square (missing glyph). 10 is not observable on the client (covered by tests).
 
