@@ -50,6 +50,7 @@ type Entry = {
 	session: any,
 	challengeAt: { [number]: boolean },
 	challengeN: number,
+	pending: number, -- squirrel moments reached but not yet opened
 	leash: Beam?,
 	squirrel: Model?,
 	target: Attachment?,
@@ -231,11 +232,19 @@ local function resolve(player: Player, entry: Entry, challengeId: string, result
 	end)
 end
 
-local function openSquirrel(player: Player, entry: Entry)
+local openSquirrel
+function openSquirrel(player: Player, entry: Entry)
 	local run = entry.run
 	if walks[player] ~= entry or not TrailRules.isLive(run, run.id) then
 		return
 	end
+	if run.open then
+		-- One challenge at a time: wait for the open one to settle, then
+		-- run this one, so every planned squirrel moment happens.
+		task.delay(0.5, openSquirrel, player, entry)
+		return
+	end
+	entry.pending = math.max(0, entry.pending - 1)
 	local pet = S.Pet.getActive(player)
 	local place = Places.get("trail")
 	if not pet or not place then
@@ -328,6 +337,7 @@ local function begin(player: Player, head: BasePart)
 		session = nil,
 		challengeAt = {},
 		challengeN = 0,
+		pending = 0,
 	}
 	for _, m in TrailRules.pickChallengeMarkers(#markers, math.random(2, 3), math.random) do
 		entry.challengeAt[m] = true
@@ -408,6 +418,13 @@ local function tick()
 			continue
 		end
 		local run = entry.run
+		if TrailRules.allMarkers(run) then
+			-- Every marker reached: finish once queued squirrels are settled.
+			if entry.pending == 0 and not run.open then
+				finishWalk(player, entry)
+			end
+			continue
+		end
 		local index = run.nextMarker
 		local at = markers[index]
 		if at then
@@ -415,9 +432,10 @@ local function tick()
 			if d <= TrailRules.MARKER_RADIUS and TrailRules.reachMarker(run, run.id, index, d, now) then
 				push(player, { state = "marker", runId = run.id, index = index, total = #markers })
 				if entry.challengeAt[index] then
+					entry.pending += 1
 					task.delay(0.6 + math.random() * 0.8, openSquirrel, player, entry)
 				end
-				if TrailRules.allMarkers(run) then
+				if TrailRules.allMarkers(run) and entry.pending == 0 and not run.open then
 					finishWalk(player, entry)
 					continue
 				end

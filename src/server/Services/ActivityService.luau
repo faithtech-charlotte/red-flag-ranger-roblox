@@ -48,8 +48,14 @@ function Activity.def(id: string)
 	return Definitions[id]
 end
 
+-- The player's root part, or nil when there is no living character (a dead
+-- character can't make progress in any activity).
 function Activity.hrp(player: Player): BasePart?
 	local c = player.Character
+	local humanoid = c and c:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.Health <= 0 then
+		return nil
+	end
 	return c and c:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
@@ -234,6 +240,29 @@ function Activity.start()
 		Activity.interrupt(player, "cancelled")
 		return true
 	end, 0.3)
+	-- Dying (or respawning) ends whatever the player was doing; each
+	-- mechanic cleans up through its onInterrupt.
+	local function watch(player: Player)
+		local function onCharacter(character: Model)
+			local humanoid = character:WaitForChild("Humanoid", 10)
+			if humanoid and humanoid:IsA("Humanoid") then
+				humanoid.Died:Connect(function()
+					Activity.interrupt(player, "died")
+				end)
+			end
+		end
+		player.CharacterAdded:Connect(onCharacter)
+		player.CharacterRemoving:Connect(function()
+			Activity.interrupt(player, "died")
+		end)
+		if player.Character then
+			task.spawn(onCharacter, player.Character)
+		end
+	end
+	Players.PlayerAdded:Connect(watch)
+	for _, player in Players:GetPlayers() do
+		watch(player)
+	end
 	Players.PlayerRemoving:Connect(function(player)
 		Activity.interrupt(player, "left")
 		lastPaid[player] = nil

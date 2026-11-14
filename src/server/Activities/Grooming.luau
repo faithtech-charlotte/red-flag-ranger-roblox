@@ -85,7 +85,8 @@ local function begin(player: Player, station: BasePart)
 			pet.model:PivotTo(CFrame.new(spot.WorldPosition)) -- hop in if it got stuck
 		end
 		if Activity.current(player) == session and S.Pet.isCurrent(player, token) then
-			S.Pet.setState(player, "Grooming", { byActivity = true })
+			local _, _, groomToken = S.Pet.setState(player, "Grooming", { byActivity = true })
+			session.data.petToken = groomToken
 			-- Hold the dog in the tub (hold = where it is now). Only now do
 			-- step reports count.
 			GroomRules.setReady(run, os.clock())
@@ -141,15 +142,21 @@ local function step(player: Player, payload: any): (boolean, string?)
 		model:SetAttribute("ShinyUntil", workspace:GetServerTimeNow() + SHINE_SECONDS)
 	end
 	S.Net.push(player, Remotes.PushKinds.Grooming, { state = "done", runId = run.id, stars = stars })
-	-- The dog shakes off in the tub, then hops out sparkling and the rewards
-	-- (with the shine as the rating) are paid once.
+	-- Rewards (with the shine as the rating) are paid once, right now, so a
+	-- disconnect during the shake can't lose them.
+	Activity.complete(player, "grooming", { rating = stars })
+	-- The dog shakes off in the tub, then hops out sparkling. Only this run's
+	-- dog state is settled: a new visit started meanwhile keeps its own.
 	S.Pet.react(player, "shake")
+	local petToken = session.data.petToken
 	task.delay(1.2, function()
-		setFx(player, nil)
-		if S.Pet.getState(player) == "Grooming" then
+		local current = Activity.current(player)
+		if not (current and current.id == "grooming") then
+			setFx(player, nil)
+		end
+		if petToken and S.Pet.isCurrent(player, petToken) then
 			S.Pet.settle(player)
 		end
-		Activity.complete(player, "grooming", { rating = stars })
 	end)
 	return true, nil
 end
