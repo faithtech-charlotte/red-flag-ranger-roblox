@@ -1741,3 +1741,12 @@ Ranger (26/30) is reachable on every row. Cadet (18/30) is reachable without Roo
 24. **Adults in healthy beats.** Priya (shopkeeper) and Coach Sam (trusted adult) get no Block/Report buttons, following the existing peer-only rule. A free gift from an adult is modeled in public, with no strings and an easy no. The reviewer should confirm this message is the one wanted.
 25. **Show category selection** is an engineering rule, not copy. I only supplied the five category lines and the `best_buddy` default.
 26. **Target lengths.** Most scenes are 30-60 s. Onboarding is shorter on purpose (about 30 s total). `review_patrol` runs 45-60 s for six cards. `lee_tell` is as long as the player wants.
+
+## Owner decisions on the author's notes (2026-11-14)
+
+| Note | Decision |
+|---|---|
+| 2. What earns Reach Out when telling Lee | Picking at least one fact. "I'm not sure", "I agreed at first" and "That's all I want to say" alone earn nothing, are always allowed, and Lee is equally warm |
+| 6. General Help topic after living it in a scene | Lee gently asks "Did this happen in one of the park stories?"; yes gives the same credit as the story tell menu. Small change to `help_lee` |
+| 14. Blocking both Sparkz and Cara | Cara stays blockable; Lee can also open the practice menu, so every earning route stays reachable |
+| 12. Help pressed mid-scene | Ends the scene as a safe exit with Lee getting its context; Sparkz never resumes that pressure |
