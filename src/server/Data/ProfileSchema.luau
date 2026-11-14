@@ -41,7 +41,9 @@ export type Profile = {
 	inventory: { [string]: number },
 	playerEquipped: { [string]: string },
 	quests: { [string]: boolean },
-	activities: { [string]: { count: number, best: number? } },
+	-- best: fastest time; bestRating: best 1-3 star rating (trail stars,
+	-- spa shine). Optional fields, so no schema bump is needed.
+	activities: { [string]: { count: number, best: number?, bestRating: number? } },
 	unlocks: { [string]: boolean },
 	claims: { [string]: boolean },
 	arcs: { [string]: ArcProgress },
