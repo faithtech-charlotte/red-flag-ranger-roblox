@@ -115,7 +115,14 @@ Run C:
 | 18 | Pass: after HUD Help and finishing with Lee, no "Cara waves." in the next 76 s |
 | Bug | Fixed: Sparkz could not be talked to by walking up. The squeaky duck's E prompt (7.5 studs away) always won the key. Sparkz moved to (-114, -70); not yet re-checked |
 
-Not run yet: 5, 6 (Help after walking away), 7 (live), 8, 16, 20. 10 is not observable on the client (covered by tests).
+Run B (after the Sparkz move, 275/275 tests):
+
+| # | Result |
+|---|---|
+| Fix | Pass: Sparkz's Talk prompt shows at (-114, -70); E by walking up starts E1 and E2 |
+| 6, 16 | Pass: E2 started by walking up, walked 33 studs away with the panel open, Ask Lee for help opened Lee's E2 menu |
+
+Not run yet: 5, 7 (live), 8, 20. 10 is not observable on the client (covered by tests).
 
 Also seen: the Help popup's close button shows an empty square (missing glyph). 10 is not observable on the client (covered by tests).
 
