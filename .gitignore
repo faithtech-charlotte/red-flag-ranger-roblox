@@ -8,3 +8,4 @@
 sourcemap.json
 *.rbxl
 *.rbxl.lock
+tools/studio-sync/manifest.json

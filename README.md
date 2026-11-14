@@ -29,6 +29,34 @@ A Roblox pet adventure (ages 9 to 13) built for the FaithTech hackathon with Pre
 
 A yellow beam points to the next Ranger Journal objective.
 
+## Phase 2: your dog as a companion
+
+| Feature | How it works |
+|---|---|
+| **Pet menu** | Press **Q** (gamepad **Y**) near your dog, tap its prompt, or press **🐶 My Dog**. Shows name, Bond Level, next unlock, and only the actions that fit right now. Locked or cooling-down actions show why. While it's open, your dog sits and pays attention. |
+| **Actions** | Pet, Feed (free kibble every 45 s, or treats), Fetch, Brush, Sit, Stay (Bond Level 2), Come, Tricks (Spin at 3, High-five at 5, Play Bow at 6, Zoomies at 8). |
+| **Bond XP** | Earned from petting, feeding, fetch, brushing, tricks, the spa, training, and activities. Per-source cooldowns plus a soft daily cap (full XP, then half, then 0). Bond never goes down. Level 10 gives the Best Friend Collar. All numbers are in `src/shared/Catalogs/BondCatalog.luau`. |
+| **Fetch** | Aim and throw: point and click, tap the ground, or aim with the camera (gamepad RT). Works anywhere. 3 catches in Sunny Dog Park complete the park challenge. Balls that land on roofs or out of bounds "poof" and you get a new one. |
+| **Spa** | Grooming tubs at the salon: brush, wash, rinse, dry. Tap or sweep over the spots. Your dog sparkles afterward. |
+| **Trick training** | Training mat at the Training Grounds. Press when the marker is in the green zone; the server does the timing. Gets harder each time you finish. |
+| **Agility** | Same course, now with one-time Gold (<16 s) and Silver (<24 s) bonuses. |
+| **New places** | Bo's Treat Shop (treats), Ranger HQ (mission board and campfire; Ranger Lee is still there), ball bucket and squeaky toys in the park, signposts at the crossroads. |
+
+**Behavior states** (`src/server/Logic/PetStateMachine.luau`): Following, Sitting, Staying (base); Idle, Eating, BeingPetted, Grooming, PerformingTrick (temporary; they return to the base state on their own); MovingToTarget, Fetching, Returning (driven by an activity). One `AlignPosition` moves the dog, and each state says where it points, so movers never compete.
+
+**Activities** (`src/server/Content/Activities.luau` + `src/server/Activities/*`): definitions hold rewards and rules; mechanics do the playing. `ActivityService.complete()` is the only place that pays rewards.
+
+**Animations** are procedural (no uploaded assets). To use real animations, put asset ids in `PetCatalog.AnimationIds` keyed by state; the procedural pose is the fallback.
+
+## Playing with your dog (feel overhaul)
+
+- **Action bar** (bottom-left) slides in when you stand still near your dog and hides while you play. Q / gamepad Y open it from anywhere; on touch, use the 🐶 button.
+- **Petting:** ✋ Pet eases the camera into a close side shot. Stroke your dog with the mouse or your finger, or hold Space / gamepad A. The dog leans into your hand, squints, wags faster the more you pet, and thumps a back leg when you rub its side. Hearts come off your hand. A few seconds of real petting earns Bond XP (server-checked).
+- **Fetch:** 🎾 Ball equips a real ball tool. Hold to wind up (a dotted arc and landing ring show the throw; your dog crouches, ready), release to throw. The ball is real physics and bounces. Your dog waits a beat, sprints, grabs it (air catches get a banner), trots back proudly, drops it at your feet and sits for praise. The ball pops back into your hand. Roofs and out-of-bounds throws "poof" and you get a new ball.
+- **Alive:** blinking, looking at you or the ball, head tilts, sniffing, scratching, play bows, little hops, yawns, lying down after a long rest, "Woof!" bubbles, nom-nom while eating.
+
+**Missing production assets** (the code has placeholders and hooks): bark / whine / pant / crunch / squeaky-ball / bounce sounds (`Client/UI/Sounds.luau` `CUSTOM`), authored dog animations for sit, lie, eat, pet-lean, run, catch, and tricks (`PetCatalog.AnimationIds`), a hand cursor image and heart particle textures.
+
 ## Architecture
 
 ```
