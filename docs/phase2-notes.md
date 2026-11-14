@@ -76,3 +76,28 @@ New: `Content/Campaign/{Facts,Shared,Onboarding,Sparkz,Healthy,Cara,Lee,Roleplay
 - `cara_coach_return` not built (Phase 4); `needsCoaching` is set/cleared but nothing offers coaching yet.
 - Hidden Sparkz uses local transparency only; if its parts collide, an invisible Sparkz could block movement. Check in Studio.
 - No automated test of `EncounterService` itself (not pure); the exit matrix runs the same rules through a mirror of its choice handling.
+
+## Studio run, 2026-11-14 (session 5, on 6da77f4)
+
+Full suite 248/248. Codex Phase 2 review: APPROVE after 4 rounds (fixes in 79a71cb, f1a3c41, 9f7de58, 98b7c45, 6da77f4).
+
+| # | Result |
+|---|---|
+| 1 | Pass: Lee's radio ~2 s after adopting, practice tip, Cara intro |
+| 2 | Pass: card 3 s after an activity; Sparkz at (-100, -62) with a golden dog, local only; Pal decline; Leave paid nothing; "Cara waves." |
+| 3 | Pass: Riley, Not right now, Something feels off, Back |
+| 4 | Pass: Leave at the school question, Cara's card, Sparkz hidden after |
+| 7 | Part: roleplay block goes to the debrief, Cara stays visible. Live early block not run |
+| 9 | Part: ambient skip shows "Okay, skipped..." |
+| 12 | Part: an open card survives respawn |
+| 14 | Pass |
+| 15 | Pass |
+| 17 | Pass: stale rev ignored; Help naming an older session ignored; Help with a stale rev on the current session works |
+| 19 | Pass: Lee's E2 contextual menu |
+| 22 | Pass: Something feels off gone after a wrong answer; a second request is refused |
+| 23 | Pass: "Thanks for trying that again" |
+| 24 | Pass: starting a spa closes the open card |
+
+Not run yet (each needs a fresh E2, so a new Play): 5, 6, 7 (live), 8, 10 (not observable on the client), 11, 13, 16, 18, 20, 21.
+
+Found: the Rinse step's 💧 renders as an empty box; the spa prompt sometimes doesn't show after a teleport until the character moves.
