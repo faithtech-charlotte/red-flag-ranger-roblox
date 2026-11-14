@@ -11,6 +11,7 @@
 	  rewardCooldown  seconds after a paid completion before coins pay again
 	                  (stops reward loops; the activity still works)
 	  medals          optional time-based bonus tiers (each claimed once)
+	  parSeconds      Trail Walk: the time that earns full time credit
 ]]
 
 return {
@@ -51,5 +52,14 @@ return {
 		requires = { { type = "hasPet" } },
 		rewards = { coins = 5, firstBonus = 10, bond = "training" },
 		rewardCooldown = 10,
+	},
+	trail_walk = {
+		id = "trail_walk",
+		name = "Trail Walk",
+		location = "trail",
+		parSeconds = 60, -- at or under this time counts fully toward trail stars
+		requires = { { type = "hasPet" } },
+		rewards = { coins = 10, firstBonus = 15, bond = "activity" },
+		rewardCooldown = 30,
 	},
 }

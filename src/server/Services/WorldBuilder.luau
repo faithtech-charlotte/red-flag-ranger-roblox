@@ -7,6 +7,8 @@
 	hand-edit: play once, copy Workspace.World, stop, paste it into Workspace,
 	and save. Keep the named parts the game looks for:
 	  World.Agility.AgilityStart / AgilityFinish / parts with RingIndex 1..N
+	  World.Trail: a part tagged TrailHead, parts with MarkerIndex 1..N and
+	  parts with SniffIndex 1..N
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -495,6 +497,142 @@ local function buildAgility(parent: Instance)
 	end
 end
 
+-- Trail Walk: a public loop west of the dog park, in view of it. The
+-- trailhead sits at its north-east corner; 10 paw markers run around the
+-- loop (south first) and the last one is back beside the trailhead. A
+-- plain fence runs along part of the far (west) side as scenery. Nothing is
+-- built beyond it.
+local TRAIL_MARKERS = 10
+local function buildTrail(parent: Instance)
+	local m = folder("Trail", parent)
+	local dirt = Color3.fromRGB(214, 180, 130)
+	local east, west, north, south = -145, -187, 8, -88
+	local w = 6
+	-- Legs (north/south a hair taller so the corners don't flicker).
+	block(m, "TrailPath", Vector3.new(w, 0.15, north - south + w), east, 0, (north + south) / 2, dirt)
+	block(m, "TrailPath", Vector3.new(w, 0.15, north - south + w), west, 0, (north + south) / 2, dirt)
+	block(m, "TrailPath", Vector3.new(east - west + w, 0.17, w), (east + west) / 2, 0, north, dirt)
+	block(m, "TrailPath", Vector3.new(east - west + w, 0.17, w), (east + west) / 2, 0, south, dirt)
+	-- Connector along the dog park's north fence (z = 0), from near the
+	-- treat shop (x = -50) to the trail's east edge (x = -142).
+	block(m, "TrailConnector", Vector3.new(92, 0.15, 6), -96, 0, 6, dirt)
+
+	-- Trailhead
+	local head = block(m, "TrailHead", Vector3.new(6, 0.3, 6), -139, 0, 4, C.green, { Material = Enum.Material.Neon, CanCollide = false })
+	CollectionService:AddTag(head, "TrailHead")
+	-- Sign just north of the connector, facing east toward town.
+	block(m, "TrailSignPost", Vector3.new(0.5, 7.4, 0.5), -136.5, 0, 12, C.wood)
+	sign(m, "🐾 Meadow Trail", CFrame.new(-136.1, 6.6, 12) * CFrame.Angles(0, math.rad(-90), 0), Vector2.new(7, 1.5), C.green)
+	sign(m, "Follow the paw prints!", CFrame.new(-136.1, 5.2, 12) * CFrame.Angles(0, math.rad(-90), 0), Vector2.new(7, 1), C.orange)
+
+	-- Paw markers, evenly spaced along the loop (by path distance).
+	local route = {
+		Vector3.new(east, 0, 4),
+		Vector3.new(east, 0, south),
+		Vector3.new(west, 0, south),
+		Vector3.new(west, 0, north),
+		Vector3.new(east, 0, north),
+		Vector3.new(east, 0, 4),
+	}
+	local length = 0
+	for i = 2, #route do
+		length += (route[i] - route[i - 1]).Magnitude
+	end
+	local function pointAt(d: number): Vector3
+		for i = 2, #route do
+			local seg = (route[i] - route[i - 1]).Magnitude
+			if d <= seg then
+				return route[i - 1]:Lerp(route[i], d / seg)
+			end
+			d -= seg
+		end
+		return route[#route]
+	end
+	for i = 1, TRAIL_MARKERS do
+		local at = pointAt(length * i / TRAIL_MARKERS - 8)
+		local marker = part(m, {
+			Name = "TrailMarker",
+			Size = Vector3.new(4, 0.1, 4),
+			CFrame = CFrame.new(at.X, 0.24, at.Z),
+			Transparency = 1,
+			CanCollide = false,
+			CanQuery = false,
+			CanTouch = false,
+		})
+		marker:SetAttribute("MarkerIndex", i)
+		local gui = Instance.new("SurfaceGui")
+		gui.Face = Enum.NormalId.Top
+		gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+		gui.PixelsPerStud = 50
+		gui.LightInfluence = 0
+		local disc = Instance.new("Frame")
+		disc.Size = UDim2.fromScale(1, 1)
+		disc.BackgroundColor3 = Color3.fromRGB(255, 236, 160)
+		disc.BackgroundTransparency = 0.25
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0.5, 0)
+		corner.Parent = disc
+		local paw = Instance.new("TextLabel")
+		paw.Size = UDim2.fromScale(0.7, 0.62)
+		paw.Position = UDim2.fromScale(0.15, 0.08)
+		paw.BackgroundTransparency = 1
+		paw.TextScaled = true
+		paw.Text = "🐾"
+		paw.Parent = disc
+		local number = Instance.new("TextLabel")
+		number.Size = UDim2.fromScale(1, 0.26)
+		number.Position = UDim2.fromScale(0, 0.68)
+		number.BackgroundTransparency = 1
+		number.Font = Enum.Font.FredokaOne
+		number.TextScaled = true
+		number.TextColor3 = C.dark
+		number.Text = tostring(i)
+		number.Parent = disc
+		disc.Parent = gui
+		gui.Parent = marker
+	end
+
+	-- Sniff spots: bushes just inside the loop, 5 studs from the path's middle.
+	local sniffs = { Vector3.new(east - 5, 0, -30), Vector3.new(-170, 0, south + 5), Vector3.new(west + 5, 0, -20) }
+	for i, at in sniffs do
+		local bush = part(m, {
+			Name = "SniffSpot",
+			Shape = Enum.PartType.Ball,
+			Size = Vector3.one * 2.6,
+			CFrame = CFrame.new(at.X, 1, at.Z),
+			Color = C.leaf2,
+			Material = Enum.Material.Grass,
+			CanCollide = false,
+		})
+		bush:SetAttribute("SniffIndex", i)
+		local gui = Instance.new("BillboardGui")
+		gui.Size = UDim2.fromOffset(110, 28)
+		gui.StudsOffset = Vector3.new(0, 2.4, 0)
+		gui.MaxDistance = 50
+		gui.LightInfluence = 0
+		local label = Instance.new("TextLabel")
+		label.Size = UDim2.fromScale(1, 1)
+		label.BackgroundTransparency = 1
+		label.Font = Enum.Font.FredokaOne
+		label.TextScaled = true
+		label.TextColor3 = Color3.new(1, 1, 1)
+		label.TextStrokeTransparency = 0.3
+		label.Text = "👃 Sniff spot"
+		label.Parent = gui
+		gui.Parent = bush
+	end
+
+	-- Scenery: a plain fence along part of the far side (nothing beyond it)
+	-- and two trees inside the loop.
+	fenceLine(m, Vector3.new(west - 5, 0, -80), Vector3.new(west - 5, 0, 0), C.wood)
+	tree(m, -166, -22, 1.1, C.leaf)
+	tree(m, -162, -62, 0.9, C.leaf2)
+end
+
+function World.getTrail(): Instance?
+	return root and root:FindFirstChild("Trail", true)
+end
+
 local function buildPaths(parent: Instance)
 	local m = folder("Paths", parent)
 	block(m, "Avenue", Vector3.new(10, 0.15, 124), 0, 0, -28, C.path)
@@ -508,6 +646,7 @@ local function buildPaths(parent: Instance)
 		{ "▲ Training Grounds", C.blue },
 		{ "◀ Sunny Dog Park", C.green },
 		{ "Fluff & Puff Salon ▶", C.pink },
+		{ "◀ Meadow Trail", C.wood },
 	}
 	for i, line in lines do
 		sign(m, line[1], CFrame.new(7, 11 - i * 1.7, -19.6) * CFrame.Angles(0, math.rad(180), 0), Vector2.new(7.5, 1.4), line[2])
@@ -532,6 +671,7 @@ local function scatter(parent: Instance, rng: Random)
 		local x, z = rng:NextNumber(-200, 200), rng:NextNumber(-200, 160)
 		local pos = Vector3.new(x, 0, z)
 		local onPath = math.abs(x) < 10 or math.abs(z + 30) < 9
+			or (x < -44 and x > -150 and z > -4 and z < 16) -- trail connector
 		local inPlace = false
 		for id in Places.All do
 			if Places.isInside(id, pos, 8) then
@@ -594,6 +734,7 @@ function World.init(_services)
 	buildDogPark(root, rng)
 	buildSalon(root)
 	buildAgility(root)
+	buildTrail(root)
 	scatter(root, rng)
 	root.Parent = workspace
 end

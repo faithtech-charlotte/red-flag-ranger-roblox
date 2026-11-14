@@ -33,6 +33,7 @@ Remotes.RequestKinds = {
 	GroomStep = "groomStep",
 	ActivityCancel = "activityCancel",
 	TrainPress = "trainPress",
+	TrailHold = "trailHold", -- { runId, challengeId, phase = "start" | "end" }
 	DialogueChoose = "dialogueChoose",
 	DialogueClose = "dialogueClose",
 	DialogueSafety = "dialogueSafety",
@@ -58,6 +59,7 @@ Remotes.PushKinds = {
 	FetchAim = "fetchAim",
 	Grooming = "grooming",
 	Training = "training",
+	TrailWalk = "trailWalk",
 	OpenMissions = "openMissions",
 }
 

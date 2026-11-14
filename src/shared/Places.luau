@@ -64,6 +64,16 @@ local Places: { [string]: Place } = {
 		color = Color3.fromRGB(80, 160, 255),
 		entrance = Vector3.new(0, 0, -92),
 	},
+	-- A public looped trail west of the dog park, in view of it. A plain
+	-- fence runs along part of its far side as scenery; nothing is beyond it.
+	trail = {
+		id = "trail",
+		displayName = "Meadow Trail",
+		center = Vector3.new(-166, 0, -40),
+		size = Vector3.new(60, 30, 112),
+		color = Color3.fromRGB(196, 150, 90),
+		entrance = Vector3.new(-140, 0, 4), -- the trailhead
+	},
 }
 
 local M = {}
