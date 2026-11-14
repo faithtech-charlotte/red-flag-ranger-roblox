@@ -68,7 +68,7 @@ New: `Content/Campaign/{Facts,Shared,Onboarding,Sparkz,Healthy,Cara,Lee,Roleplay
 21. Walk arrival with a panel open: accept the walk, open the journal, walk into Ranger HQ. Expect Lee waits until the journal closes.
 22. Reflection: E2 → Something feels off → wrong answer → Back. Expect Something feels off gone from the bar; no Recognize credit.
 23. Roleplay recovery: rp_e2_deal → agree → retry → refuse → no deal → continue. Expect the debrief's retry text (`agreed_retry_ok`).
-24. Card over play: with an invitation card open, start a Trail Walk. Expect the card closes (interrupted) and returns only after another activity and the gap.
+24. Card over play: with an invitation card open, start a Trail Walk. Expect the card closes (interrupted, not Later): it can return once the 90 s gap passes and the player is free, with no new activity needed (unlike Later, which waits for another completed activity).
 
 ## Not done
 
