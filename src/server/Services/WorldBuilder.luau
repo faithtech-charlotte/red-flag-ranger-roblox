@@ -375,8 +375,8 @@ local function buildSalon(parent: Instance)
 		local station = block(m, "GroomStation", Vector3.new(7, 0.6, 5), p.center.X + 2, 2.5, z, C.white, { Transparency = 1, CanCollide = false })
 		local spot = Instance.new("Attachment")
 		spot.Name = "DogSpot"
-		spot.WorldPosition = Vector3.new(p.center.X + 2, 2.4 + DogRig.GROUND_OFFSET, z)
 		spot.Parent = station
+		spot.WorldPosition = Vector3.new(p.center.X + 2, 2.4 + DogRig.GROUND_OFFSET, z)
 		CollectionService:AddTag(station, "GroomStation")
 		sign(m, "🛁 Spa Tub", CFrame.new(p.center.X + 2, 6.5, z + (i == 1 and -2.7 or 2.7)) * CFrame.Angles(0, i == 1 and 0 or math.rad(180), 0), Vector2.new(4, 1), C.purple)
 	end

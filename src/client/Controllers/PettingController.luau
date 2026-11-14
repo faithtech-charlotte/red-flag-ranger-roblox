@@ -184,7 +184,7 @@ function Petting.stop()
 	if c then
 		c:Enable()
 	end
-	task.spawn(State.request, Remotes.RequestKinds.PetAction, { action = "petEnd" })
+	task.spawn(State.request, Remotes.RequestKinds.PetEnd)
 end
 
 function Petting.begin()

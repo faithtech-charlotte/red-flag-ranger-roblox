@@ -255,7 +255,7 @@ function Fetch.throw(player: Player, aim: any, power: any): (boolean, string?)
 		setPetAttr(player, "Ready", false)
 		local pet = S.Pet.getActive(player)
 		if not pet then
-			Activity.interrupt(player, "no pet")
+			Activity.interrupt(player, "no pet", session)
 			return
 		end
 		local feet = pet.model:GetAttribute("GroundOffset") or 1.5
@@ -265,7 +265,7 @@ function Fetch.throw(player: Player, aim: any, power: any): (boolean, string?)
 		aimChase(b.Position, groundBelow(b.Position, b))
 		local ok, _, token = S.Pet.setState(player, "Fetching", { byActivity = true, target = chase, fast = true })
 		if not ok then
-			Activity.interrupt(player, "no pet")
+			Activity.interrupt(player, "no pet", session)
 			return
 		end
 
@@ -274,7 +274,7 @@ function Fetch.throw(player: Player, aim: any, power: any): (boolean, string?)
 		local caught, air, unreachable = false, false, false
 		while t < CHASE_TIMEOUT do
 			if not S.Pet.isCurrent(player, token) or Activity.current(player) ~= session or not b.Parent then
-				Activity.interrupt(player, "interrupted")
+				Activity.interrupt(player, "interrupted", session)
 				return
 			end
 			local pos = b.Position
@@ -356,14 +356,14 @@ function Fetch.throw(player: Player, aim: any, power: any): (boolean, string?)
 		chase:Destroy()
 		local ok2, _, token2 = S.Pet.setState(player, "Returning", { byActivity = true, fast = true })
 		if not ok2 then
-			Activity.interrupt(player, "interrupted")
+			Activity.interrupt(player, "interrupted", session)
 			return
 		end
 		local back = false
 		local t2 = 0
 		while t2 < RETURN_TIMEOUT do
 			if not S.Pet.isCurrent(player, token2) or Activity.current(player) ~= session then
-				Activity.interrupt(player, "interrupted")
+				Activity.interrupt(player, "interrupted", session)
 				return
 			end
 			local h = character:FindFirstChild("HumanoidRootPart") :: BasePart?

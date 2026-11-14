@@ -92,9 +92,10 @@ function Activity.finish(player: Player, session: Session?)
 	end
 end
 
-function Activity.interrupt(player: Player, reason: string)
+-- Async mechanics pass their session so stale tasks cannot cancel a replacement.
+function Activity.interrupt(player: Player, reason: string, expectedSession: Session?)
 	local session = sessions[player]
-	if not session then
+	if not session or (expectedSession ~= nil and session ~= expectedSession) then
 		return
 	end
 	sessions[player] = nil

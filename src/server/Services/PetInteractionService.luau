@@ -325,6 +325,8 @@ end
 
 function Interaction.start()
 	S.Net.on(Remotes.RequestKinds.PetAction, handle, 0.15)
+	-- Ending is idempotent and must work even immediately after a petStroke.
+	S.Net.on(Remotes.RequestKinds.PetEnd, handlers.petEnd, 0)
 	Players.PlayerRemoving:Connect(function(player)
 		readyAt[player] = nil
 		petting[player] = nil
