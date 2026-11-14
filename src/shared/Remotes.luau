@@ -27,6 +27,7 @@ Remotes.RequestKinds = {
 	Unequip = "unequip",
 	UseItem = "useItem",
 	PetAction = "petAction",
+	PetEnd = "petEnd",
 	FetchThrow = "fetchThrow",
 	FetchReady = "fetchReady",
 	GroomStep = "groomStep",
