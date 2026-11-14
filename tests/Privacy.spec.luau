@@ -17,6 +17,8 @@ local FORBIDDEN = {
 	"learningV2", "learning", "campaign", "evidence", "encountered", "seenFacts",
 	"toldCara", "toldLee", "needsCoaching", "review", "firstAttempt", "rulesVersion",
 	"thresholds", "slots", "titles", "arcs", "claims", "npcs",
+	-- Phase 2 story flags and scene state
+	"story", "palChoice", "palRepeat", "outcomes", "followUpOffered", "recoverySeen", "concern",
 }
 
 local function findKey(value: any, key: string, depth: number?): boolean
@@ -54,11 +56,29 @@ return function(t)
 		expect(view.showRibbon).toBe(true)
 	end)
 
+	t.test("snapshot presence is npc ids to booleans, nothing else", function()
+		local p = ProfileSchema.default(0)
+		p.campaign.beats.e2 = "eligible"
+		p.story.palChoice = "declined"
+		p.story.outcomes.e1 = "friendly"
+		local view = Data.view(p, { blocked = {}, cooldowns = {}, persistent = false, present = { sparkz_pup = true } })
+		for _, key in FORBIDDEN do
+			if findKey(view, key) then
+				error(`snapshot exposes "{key}"`)
+			end
+		end
+		for npcId, v in view.present do
+			expect(typeof(npcId)).toBe("string")
+			expect(typeof(v)).toBe("boolean")
+		end
+		expect(view.present.sparkz_pup).toBe(true)
+	end)
+
 	t.test("no replicated module contains scoring rules or the ledger", function()
 		for _, inst in ReplicatedStorage:GetDescendants() do
 			if inst:IsA("LuaSourceContainer") then
 				local src = (inst :: any).Source
-				for _, word in { "ScoreRules", "learningV2", "LearningProgress", "EncounterScheduler", "thresholds" } do
+				for _, word in { "ScoreRules", "learningV2", "LearningProgress", "EncounterScheduler", "thresholds", "StoryRules", "leeReply" } do
 					if src:find(word, 1, true) then
 						error(`{inst:GetFullName()} mentions {word}`)
 					end

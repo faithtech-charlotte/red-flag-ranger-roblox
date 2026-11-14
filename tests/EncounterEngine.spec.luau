@@ -5,6 +5,12 @@ local EncounterEngine = require(Server.Logic.EncounterEngine)
 local ProfileSchema = require(Server.Data.ProfileSchema)
 local Content = require(Server.Content)
 
+-- The Jordan arc is unscheduled while the campaign runs (plan change 7).
+-- These tests keep checking the arc engine itself on a scheduled copy.
+local scheduledArc = table.clone(Content.arcs.jordan_arc)
+scheduledArc.scheduled = nil
+local JordanContent = { npcs = Content.npcs, encounters = Content.encounters, arcs = { jordan_arc = scheduledArc } }
+
 return function(t)
 	local expect = t.expect
 
@@ -21,6 +27,7 @@ return function(t)
 			complete_quest = true, unlock_activity = true, simulate_block = true, simulate_report = true,
 			open_help = true, end_conversation = true, record_learning = true, set_arc_flag = true,
 			show_waypoint = true, pet_react = true,
+			learning = true, campaign = true, open_scene = true, walk_to_lee = true,
 		}
 		local problems = EncounterEngine.validate(Content, function(name)
 			return known[name] == true
@@ -32,55 +39,55 @@ return function(t)
 
 	t.test("Jordan does not appear before fetch", function()
 		local p = freshProfile()
-		local enc = EncounterEngine.select(Content, p, "jordan", "dog_park")
+		local enc = EncounterEngine.select(JordanContent, p, "jordan", "dog_park")
 		expect(enc).toBe(nil)
 	end)
 
 	t.test("Jordan arc progresses per player through three stages", function()
 		local p = freshProfile()
 		p.activities.fetch = { count = 1 }
-		local enc, arcId = EncounterEngine.select(Content, p, "jordan", "dog_park")
+		local enc, arcId = EncounterEngine.select(JordanContent, p, "jordan", "dog_park")
 		expect(enc.id).toBe("jordan_e1_park")
-		expect(EncounterEngine.complete(Content, p, enc, arcId, "friendly")).toBe(true)
+		expect(EncounterEngine.complete(JordanContent, p, enc, arcId, "friendly")).toBe(true)
 
 		-- Encounter 2 needs the agility course and Jordan's agility spot.
-		expect(EncounterEngine.select(Content, p, "jordan", "agility")).toBe(nil)
+		expect(EncounterEngine.select(JordanContent, p, "jordan", "agility")).toBe(nil)
 		p.activities.agility = { count = 1 }
-		expect(EncounterEngine.select(Content, p, "jordan", "dog_park")).toBe(nil)
-		enc, arcId = EncounterEngine.select(Content, p, "jordan", "agility")
+		expect(EncounterEngine.select(JordanContent, p, "jordan", "dog_park")).toBe(nil)
+		enc, arcId = EncounterEngine.select(JordanContent, p, "jordan", "agility")
 		expect(enc.id).toBe("jordan_e2_agility")
-		EncounterEngine.complete(Content, p, enc, arcId, "friendly")
+		EncounterEngine.complete(JordanContent, p, enc, arcId, "friendly")
 
 		-- Encounter 3 needs one more activity after encounter 2.
-		expect(EncounterEngine.select(Content, p, "jordan", "agility")).toBe(nil)
+		expect(EncounterEngine.select(JordanContent, p, "jordan", "agility")).toBe(nil)
 		EncounterEngine.noteActivity(p)
-		enc, arcId = EncounterEngine.select(Content, p, "jordan", "agility")
+		enc, arcId = EncounterEngine.select(JordanContent, p, "jordan", "agility")
 		expect(enc.id).toBe("jordan_e3_boundary")
-		EncounterEngine.complete(Content, p, enc, arcId, "declined")
+		EncounterEngine.complete(JordanContent, p, enc, arcId, "declined")
 		expect(p.arcs.jordan_arc.done).toBe(true)
 		expect(p.arcs.jordan_arc.decisions.jordan_e3_boundary).toBe("declined")
-		expect(EncounterEngine.select(Content, p, "jordan", "agility")).toBe(nil)
+		expect(EncounterEngine.select(JordanContent, p, "jordan", "agility")).toBe(nil)
 	end)
 
 	t.test("two players get different Jordan encounters", function()
 		local a, b = freshProfile(), freshProfile()
 		a.activities.fetch = { count = 1 }
 		b.activities.fetch = { count = 1 }
-		local enc, arcId = EncounterEngine.select(Content, a, "jordan", "dog_park")
-		EncounterEngine.complete(Content, a, enc, arcId, "friendly")
+		local enc, arcId = EncounterEngine.select(JordanContent, a, "jordan", "dog_park")
+		EncounterEngine.complete(JordanContent, a, enc, arcId, "friendly")
 		a.activities.agility = { count = 1 }
 		b.activities.agility = { count = 1 }
-		expect(EncounterEngine.select(Content, a, "jordan", "agility").id).toBe("jordan_e2_agility")
-		expect(EncounterEngine.select(Content, b, "jordan", "agility")).toBe(nil)
-		expect(EncounterEngine.select(Content, b, "jordan", "dog_park").id).toBe("jordan_e1_park")
+		expect(EncounterEngine.select(JordanContent, a, "jordan", "agility").id).toBe("jordan_e2_agility")
+		expect(EncounterEngine.select(JordanContent, b, "jordan", "agility")).toBe(nil)
+		expect(EncounterEngine.select(JordanContent, b, "jordan", "dog_park").id).toBe("jordan_e1_park")
 	end)
 
 	t.test("completing twice is idempotent", function()
 		local p = freshProfile()
 		p.activities.fetch = { count = 1 }
-		local enc, arcId = EncounterEngine.select(Content, p, "jordan", "dog_park")
-		expect(EncounterEngine.complete(Content, p, enc, arcId, "friendly")).toBe(true)
-		expect(EncounterEngine.complete(Content, p, enc, arcId, "friendly")).toBe(false)
+		local enc, arcId = EncounterEngine.select(JordanContent, p, "jordan", "dog_park")
+		expect(EncounterEngine.complete(JordanContent, p, enc, arcId, "friendly")).toBe(true)
+		expect(EncounterEngine.complete(JordanContent, p, enc, arcId, "friendly")).toBe(false)
 		expect(p.arcs.jordan_arc.stage).toBe("again")
 	end)
 
@@ -88,7 +95,7 @@ return function(t)
 		local p = freshProfile()
 		p.activities.fetch = { count = 1 }
 		p.npcs.jordan = { blocked = true }
-		local enc, _, reason = EncounterEngine.select(Content, p, "jordan", "dog_park")
+		local enc, _, reason = EncounterEngine.select(JordanContent, p, "jordan", "dog_park")
 		expect(enc).toBe(nil)
 		expect(reason).toBe("blocked")
 	end)
@@ -134,9 +141,27 @@ return function(t)
 			activitiesSinceStage = 0,
 			done = false,
 		}
-		EncounterEngine.ensureArc(p, Content.arcs.jordan_arc)
+		EncounterEngine.ensureArc(p, JordanContent.arcs.jordan_arc)
 		expect(p.arcs.jordan_arc.stage).toBe("again")
-		expect(p.arcs.jordan_arc.contentVersion).toBe(Content.arcs.jordan_arc.version)
+		expect(p.arcs.jordan_arc.contentVersion).toBe(JordanContent.arcs.jordan_arc.version)
+	end)
+
+	t.test("an unscheduled arc never starts, but keeps its saved progress", function()
+		local p = freshProfile()
+		p.activities.fetch = { count = 1 }
+		p.arcs.jordan_arc = {
+			contentVersion = 1,
+			stage = "again",
+			completed = { jordan_e1_park = true },
+			decisions = {},
+			flags = {},
+			activitiesSinceStage = 3,
+			done = false,
+		}
+		expect(EncounterEngine.select(Content, p, "jordan", "dog_park")).toBe(nil)
+		expect(EncounterEngine.select(Content, p, "jordan", "agility")).toBe(nil)
+		expect(p.arcs.jordan_arc.completed.jordan_e1_park).toBe(true)
+		expect(p.arcs.jordan_arc.stage).toBe("again")
 	end)
 
 	t.test("help is available with a brand new profile", function()

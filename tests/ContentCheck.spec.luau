@@ -15,6 +15,8 @@ return function(t)
 		complete_quest = true, unlock_activity = true, simulate_block = true, simulate_report = true,
 		open_help = true, end_conversation = true, record_learning = true, set_arc_flag = true,
 		show_waypoint = true, pet_react = true,
+		-- Phase 1-2 campaign actions (ProgressionService, EncounterService, StoryService)
+		learning = true, campaign = true, open_scene = true, walk_to_lee = true,
 	}
 	local knownConditions = Conditions.knownTypes()
 
@@ -271,6 +273,142 @@ return function(t)
 			local problems = ContentCheck.check(c, fixtureRegistries)
 			if not hasProblem(problems, case.needle) then
 				error(`expected a problem containing "{case.needle}", got: {table.concat(problems, "; ")}`)
+			end
+		end)
+	end
+
+	-- A minimal valid campaign scene (full metadata, reflection, recovery).
+	local function campaignScene()
+		return {
+			id = "story",
+			campaign = true,
+			repeatable = true,
+			contentVersion = 1,
+			reviewStatus = "provisional",
+			npcId = "sparkz",
+			sceneKind = "beat",
+			beat = "e2",
+			invitation = { text = "Sparkz is waving at you." },
+			prerequisites = {},
+			facts = { "asked_school" },
+			outcomes = { "refused_held", "agreed_kept_playing" },
+			safeExits = { "bar_leave" },
+			recovery = { "recover" },
+			skills = { "S2" },
+			targetSeconds = { 30, 60 },
+			bar = "A",
+			reflect = "reflect",
+			start = "ask",
+			nodes = {
+				ask = {
+					speaker = "npc",
+					text = "What school do you go to?",
+					facts = { "asked_school" },
+					choices = {
+						{ id = "no", text = "No.", outcome = "refused_held" },
+						{ id = "agree", text = "[Share]", next = "recover", agree = true },
+					},
+				},
+				recover = {
+					speaker = "npc",
+					recovery = true,
+					text = "Hold on. The story paused.",
+					choices = {
+						{ id = "retry", text = "Let me try again.", next = "ask" },
+						{ id = "play", text = "Keep playing.", outcome = "agreed_kept_playing" },
+					},
+				},
+				reflect = {
+					speaker = "tip",
+					text = "What feels off?",
+					choices = { { id = "back", text = "Back", back = true } },
+				},
+			},
+		}
+	end
+
+	local function withScene(mutate)
+		local c = fixture()
+		local scene = campaignScene()
+		c.encounters.story = scene
+		if mutate then
+			mutate(scene, c)
+		end
+		return c
+	end
+
+	t.test("content check: a campaign scene with full metadata passes", function()
+		local problems = ContentCheck.check(withScene(nil), fixtureRegistries)
+		if #problems > 0 then
+			error(table.concat(problems, "; "))
+		end
+	end)
+
+	local campaignFailures = {
+		{ "missing content version", "missing contentVersion", function(e)
+			e.contentVersion = nil
+		end },
+		{ "missing review status", "missing reviewStatus", function(e)
+			e.reviewStatus = nil
+		end },
+		{ "missing skills", "missing skills", function(e)
+			e.skills = {}
+		end },
+		{ "not repeatable", "must be repeatable", function(e)
+			e.repeatable = nil
+		end },
+		{ "unknown scene kind", "unknown sceneKind", function(e)
+			e.sceneKind = "boss_fight"
+		end },
+		{ "declared fact never presented", "declares fact offered_coins that no node presents", function(e)
+			table.insert(e.facts, "offered_coins")
+		end },
+		{ "presented fact not declared", "presents undeclared fact offered_coins", function(e)
+			e.nodes.recover.facts = { "offered_coins" }
+		end },
+		{ "conditional fact not declared", "presents undeclared fact offered_coins", function(e)
+			e.nodes.ask.addText = { { text = "Deal?", facts = { "offered_coins" } } }
+		end },
+		{ "undeclared outcome", "ends with undeclared outcome made_up", function(e)
+			e.nodes.ask.choices[1].outcome = "made_up"
+		end },
+		{ "recovery node not listed", "recovery node missing from recovery list", function(e)
+			e.recovery = {}
+		end },
+		{ "listed recovery is not a recovery node", "is not a recovery node", function(e)
+			table.insert(e.recovery, "ask")
+		end },
+		{ "back choice without a reflection", "back choice in a scene without reflect", function(e)
+			e.reflect = nil
+		end },
+		{ "missing reflect node", "missing reflect node", function(e)
+			e.reflect = "gone"
+		end },
+		{ "unknown generated list", "unknown generated list everything", function(e)
+			table.insert(e.nodes.ask.choices, { id = "g", text = "x", generated = "everything", next = "ask" })
+		end },
+		{ "beat without an invitation", "unsolicited scenes need invitation text", function(e)
+			e.invitation = nil
+		end },
+		{ "bad target length", "targetSeconds", function(e)
+			e.targetSeconds = { 60, 30 }
+		end },
+		{ "fact from another beat", "belongs to e3, not e2", function(_e, c)
+			c.facts = { asked_school = { beat = "e3" }, offered_coins = true }
+		end },
+		{ "unknown addText condition", "unknown condition isAdmin", function(e)
+			e.nodes.ask.addText = { { text = "Hm.", conditions = { { type = "isAdmin" } } } }
+		end },
+		{ "unknown entry node", "missing entry node", function(e)
+			e.entryNodes = { "nowhere" }
+		end },
+	}
+	for _, case in campaignFailures do
+		local name, needle, mutate = case[1], case[2], case[3]
+		t.test(`content check fails (campaign): {name}`, function()
+			local problems = ContentCheck.check(withScene(mutate), fixtureRegistries)
+			if not hasProblem(problems, needle) then
+				error(`expected a problem containing "{needle}", got: {table.concat(problems, "; ")}`)
 			end
 		end)
 	end

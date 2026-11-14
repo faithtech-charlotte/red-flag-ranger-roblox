@@ -296,6 +296,16 @@ return function(t)
 		expect(S.decide(noBeat, nil)).toBe(nil)
 	end)
 
+	t.test("scheduler: only beats that have a scene are invited (available)", function()
+		local s = run(S.defaultState(), { ONBOARD, ACT })
+		expect(S.decide(s, { busy = false, available = { e1 = true } })).toEqual({ kind = "campaign", beat = "e1" })
+		-- e1 has no scene: it is passed over and doesn't hold back ambient.
+		expect(S.decide(s, { busy = false, available = { e2 = true }, ambient = "a" })).toEqual({ kind = "ambient", id = "a" })
+		expect(S.decide(s, { busy = false, available = {} })).toBe(nil)
+		-- Without the filter every eligible beat counts (Phase 1 behavior).
+		expect(S.decide(s, { busy = false })).toEqual({ kind = "campaign", beat = "e1" })
+	end)
+
 	t.test("scheduler: interrupted returns the beat to eligible, pacing unchanged", function()
 		local s = run(S.defaultState(), { ONBOARD, ACT, { kind = "invited", beat = "e1" }, { kind = "accepted", beat = "e1" }, secs(30) })
 		local before = deepCopy(s)

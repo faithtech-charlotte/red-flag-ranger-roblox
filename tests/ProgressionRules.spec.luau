@@ -63,6 +63,23 @@ return function(t)
 		expect(#sched).toBe(0)
 	end)
 
+	t.test("progression: respawn or disconnect right after the request credits like Leave", function()
+		for _, kind in { "respawn", "disconnect", "replaced" } do
+			local led, sched = Rules.exitEvents({ kind = kind, facts = { "e2_school" } }, "e2", false, isConcerning)
+			expect(#led).toBe(1)
+			expect(led[1].kind).toBe("left_after_request")
+			expect(sched[1].kind).toBe("interrupted") -- the beat still comes back
+		end
+		local led = Rules.exitEvents({ kind = "respawn", facts = { "e2_hello" } }, "e2", false, isConcerning)
+		expect(#led).toBe(0)
+	end)
+
+	t.test("progression: leaving from the recovery card earns no Respond", function()
+		local led, sched = Rules.exitEvents({ kind = "walk_away", facts = { "e2_school" }, atRecovery = true }, "e2", false, isConcerning)
+		expect(#led).toBe(0)
+		expect(sched[1].kind).toBe("resolved")
+	end)
+
 	t.test("progression: blocking Sparkz through the rule event skips the remaining beats", function()
 		local s = S.apply(S.defaultState(), { kind = "onboarding_done" })
 		s = S.apply(s, Rules.blocked("sparkz"))
