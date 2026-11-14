@@ -223,9 +223,11 @@ local function barOf(session: Session, kind: string): { string }
 	local enc = session.enc
 	local node = enc and session.nodeId and enc.nodes[session.nodeId] or nil
 	local story = session.story
+	-- When Lee runs a roleplay, his own lines are a trusted adult's.
+	local leeNarrates = story ~= nil and story.narrator == HELP_NPC and not (node ~= nil and node.pretend)
 	return StoryRules.barFor({
 		campaign = enc ~= nil and enc.campaign == true,
-		role = npcDef.role,
+		role = if leeNarrates then "trusted_adult" else npcDef.role,
 		isLee = isLeeSpeaking(session, node),
 		rule = enc and enc.bar,
 		concern = story ~= nil and story.concern,
