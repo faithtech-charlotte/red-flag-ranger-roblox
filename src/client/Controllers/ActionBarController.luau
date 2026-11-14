@@ -103,6 +103,14 @@ local function send(payload)
 	end
 end
 
+-- Sit / Stay / Come cancel a running activity on the server, so they ask
+-- first (same confirm as the whistle).
+local function command(payload)
+	if ctl.Whistle.confirmStop() then
+		send(payload)
+	end
+end
+
 local function roundButton(parent: Instance, list, icon: string, label: string, order: number, check: () -> (boolean, string?), onClick: () -> ())
 	local b = new("TextButton", {
 		Name = "Action_" .. label,
@@ -280,20 +288,20 @@ local function rebuild()
 		roundButton(row, buttons, "📣", "Come", 4, function()
 			return true, nil
 		end, function()
-			send({ action = "come" })
+			command({ action = "come" })
 		end)
 	else
 		roundButton(row, buttons, "🐕", "Sit", 4, function()
 			return touchCheck(nil)
 		end, function()
-			send({ action = "sit" })
+			command({ action = "sit" })
 		end)
 	end
 	if BondCatalog.isUnlocked(level(), "command", "stay") and state ~= "Staying" then
 		roundButton(row, buttons, "🛑", "Stay", 5, function()
 			return true, nil
 		end, function()
-			send({ action = "stay" })
+			command({ action = "stay" })
 		end)
 	end
 	if BondCatalog.isUnlocked(level(), "trick", "spin") then
