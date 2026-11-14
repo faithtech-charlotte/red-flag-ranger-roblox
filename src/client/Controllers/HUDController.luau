@@ -232,6 +232,11 @@ local function renderObjective()
 end
 
 function HUD.start(screenGui: ScreenGui, ctl)
+	task.defer(function()
+		require(script.Parent.PanelCoordinator).track("help", helpPanel, function()
+			helpPanel.Visible = false
+		end)
+	end)
 	gui = screenGui
 	controllers = ctl
 

@@ -25,12 +25,19 @@ local STORE_NAME = "RFR_PlayerProfiles_v1"
 local SESSION_STALE_SECONDS = 300
 local AUTOSAVE_SECONDS = 60
 local LOAD_ATTEMPTS = 5
+local RELEASE_ATTEMPTS = 3
+-- Checkpoint saves are coalesced to at most one write per player this often.
+local CHECKPOINT_SECONDS = 6
 
 type Entry = {
 	data: ProfileSchema.Profile,
 	persistent: boolean,
 	readOnly: boolean,
 	pushQueued: boolean,
+	saving: boolean?, -- a write is in flight
+	saveQueued: boolean?, -- a checkpoint save is scheduled
+	lastSaved: number?, -- os.clock() of the last write attempt
+	removed: boolean?, -- player left; final release in progress
 }
 
 local Data = {}
@@ -87,30 +94,72 @@ local function loadProfile(player: Player): (ProfileSchema.Profile?, boolean)
 	return nil, false
 end
 
-local function saveProfile(player: Player, release: boolean)
+-- Outcome of one save attempt: "committed" (written), "lost" (another
+-- server owns the save; stop saving), "skipped" (nothing to save here) or
+-- "failed" (DataStore error; safe to retry).
+type SaveResult = "committed" | "lost" | "skipped" | "failed"
+
+local function saveProfile(player: Player, release: boolean): SaveResult
 	local entry = entries[player]
 	if not entry or not entry.persistent or entry.readOnly or not store then
-		return
+		return "skipped"
 	end
-	local lost = false
+	-- One write per player at a time (autosave, checkpoint and release
+	-- would otherwise race).
+	while entry.saving do
+		task.wait(0.1)
+	end
+	if not entry.persistent then
+		return "skipped"
+	end
+	entry.saving = true
+	local lost, written = false, false
 	local ok, err = pcall(function()
 		(store :: DataStore):UpdateAsync(keyFor(player), function(old)
 			if not SessionRules.ownsLock(old and old.session, game.JobId) then
 				lost = true
 				return nil -- another server took over (or released); don't clobber its data
 			end
+			written = true
 			return {
 				profile = entry.data,
 				session = if release then nil else { jobId = game.JobId, updated = os.time() },
 			}
 		end)
 	end)
+	entry.saving = false
+	entry.lastSaved = os.clock()
 	if not ok then
 		warn(`[Data] save failed for {player.Name}: {err}`)
+		return "failed"
 	elseif lost then
 		-- Ownership is gone for good: stop saving this session.
 		entry.persistent = false
 		warn(`[Data] {player.Name}'s save is owned by another server; no longer saving here`)
+		return "lost"
+	end
+	return if written then "committed" else "failed"
+end
+
+-- The final save when a player leaves (or the server shuts down): retried
+-- with backoff so one DataStore hiccup doesn't lose the session.
+local function releaseProfile(player: Player)
+	local entry = entries[player]
+	if not entry then
+		return
+	end
+	entry.removed = true -- cancels any queued checkpoint
+	for attempt = 1, RELEASE_ATTEMPTS do
+		local result = saveProfile(player, true)
+		if result ~= "failed" then
+			break
+		end
+		if attempt < RELEASE_ATTEMPTS then
+			task.wait(2 ^ (attempt - 1))
+		end
+	end
+	if entries[player] == entry then
+		entries[player] = nil
 	end
 end
 
@@ -158,16 +207,13 @@ function Data.start()
 	for _, player in Players:GetPlayers() do
 		task.spawn(onPlayerAdded, player)
 	end
-	Players.PlayerRemoving:Connect(function(player)
-		saveProfile(player, true)
-		entries[player] = nil
-	end)
+	Players.PlayerRemoving:Connect(releaseProfile)
 	game:BindToClose(function()
 		local pending = 0
 		for player in entries do
 			pending += 1
 			task.spawn(function()
-				saveProfile(player, true)
+				releaseProfile(player)
 				pending -= 1
 			end)
 		end
@@ -179,8 +225,10 @@ function Data.start()
 	task.spawn(function()
 		while true do
 			task.wait(AUTOSAVE_SECONDS)
-			for player in entries do
-				task.spawn(saveProfile, player, false)
+			for player, entry in entries do
+				if not entry.removed then
+					task.spawn(saveProfile, player, false)
+				end
 			end
 		end
 	end)
@@ -191,6 +239,25 @@ function Data.start()
 		end
 		return true, nil, Data.snapshot(player)
 	end, 0.5, false)
+end
+
+-- Call after any meaningful in-memory change (a story transition, earned
+-- evidence). The in-memory profile is already authoritative for this
+-- server; this queues a durable write, coalesced to one per
+-- CHECKPOINT_SECONDS per player. Never wait on it before showing feedback.
+function Data.checkpoint(player: Player, _reason: string?)
+	local entry = entries[player]
+	if not entry or entry.removed or entry.saveQueued or not entry.persistent or entry.readOnly then
+		return
+	end
+	entry.saveQueued = true
+	local since = os.clock() - (entry.lastSaved or 0)
+	task.delay(math.max(0, CHECKPOINT_SECONDS - since), function()
+		entry.saveQueued = false
+		if entries[player] == entry and not entry.removed then
+			saveProfile(player, false)
+		end
+	end)
 end
 
 function Data.get(player: Player): ProfileSchema.Profile?

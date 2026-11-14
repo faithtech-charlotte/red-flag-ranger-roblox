@@ -225,6 +225,9 @@ function Shop.close()
 end
 
 function Shop.start(gui: ScreenGui, controllers)
+	task.defer(function()
+		require(script.Parent.PanelCoordinator).track("shop", overlay, Shop.close)
+	end)
 	hud = controllers.HUD
 	overlay = new("Frame", {
 		Name = "Shop",

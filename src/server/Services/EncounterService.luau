@@ -175,6 +175,11 @@ local function begin(player: Player, npcId: string, model: Model?, locationId: s
 end
 
 -- Opens Ranger Lee's help conversation from anywhere. Never gated.
+-- True while the player is in any conversation or Help scene.
+function Encounter.isActive(player: Player): boolean
+	return sessions[player] ~= nil
+end
+
 function Encounter.startHelp(player: Player)
 	local profile = S.Data.get(player)
 	if profile then

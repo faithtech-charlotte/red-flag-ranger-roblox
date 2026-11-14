@@ -114,7 +114,7 @@ return function(t)
 	end)
 
 	-- Saved data compatibility
-	t.test("v1 profiles migrate to v2 without losing bond", function()
+	t.test("v1 profiles migrate to the current version without losing bond", function()
 		local v1 = {
 			schemaVersion = 1,
 			wallet = { paw_coins = 70 },
@@ -123,12 +123,40 @@ return function(t)
 			inventory = { collar_cherry = 1 },
 		}
 		local p = ProfileSchema.migrate(v1, 0)
-		expect(p.schemaVersion).toBe(2)
+		expect(p.schemaVersion).toBe(ProfileSchema.CURRENT_VERSION)
 		expect(p.wallet.paw_coins).toBe(70)
 		expect(p.pets.p.bondXp).toBe(35)
 		expect(p.pets.p.bond).toBe(nil)
 		expect(p.pets.p.equipped.collar).toBe("collar_cherry")
 		expect(typeof(p.pets.p.xpLog.counts)).toBe("table")
+	end)
+
+	t.test("v2 profiles gain campaign state with no inferred learning credit", function()
+		local v2 = {
+			schemaVersion = 2,
+			wallet = { paw_coins = 40 },
+			activePetId = "p",
+			pets = { p = { id = "p", breedId = "golden", name = "Sun", displayName = "Sun", equipped = {}, bondXp = 12, xpLog = { day = 0, counts = {} }, adoptedAt = 1 } },
+			inventory = { bandana_red = 1 },
+			quests = { first_fetch = true },
+			activities = { fetch = { count = 6 } },
+			unlocks = { agility = true },
+			claims = { ["first:fetch"] = true },
+			learning = { topicsSeen = { secrets = true, personal_info = true }, toolsPracticed = { block = true } },
+		}
+		local p = ProfileSchema.migrate(v2, 0)
+		expect(p.schemaVersion).toBe(3)
+		expect(p.wallet.paw_coins).toBe(40)
+		expect(p.pets.p.bondXp).toBe(12)
+		expect(p.inventory.bandana_red).toBe(1)
+		expect(p.quests.first_fetch).toBe(true)
+		expect(p.activities.fetch.count).toBe(6)
+		expect(p.claims["first:fetch"]).toBe(true)
+		expect(p.learning.topicsSeen.secrets).toBe(true)
+		expect(next(p.learningV2.evidence)).toBe(nil)
+		expect(next(p.learningV2.toldLee)).toBe(nil)
+		expect(p.campaign.onboarded).toBe(false)
+		expect(p.show.completed).toBe(false)
 	end)
 
 	t.test("new pets start with bond fields", function()

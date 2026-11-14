@@ -33,6 +33,8 @@ local controllers = {
 	Whistle = require(Controllers.WhistleController),
 }
 
+controllers.Panels = require(Controllers.PanelCoordinator)
+
 controllers.HUD.start(gui, controllers)
 controllers.Dialogue.start(gui, controllers)
 controllers.Shop.start(gui, controllers)

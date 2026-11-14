@@ -10,7 +10,7 @@
 
 local ProfileSchema = {}
 
-ProfileSchema.CURRENT_VERSION = 2
+ProfileSchema.CURRENT_VERSION = 3
 
 export type PetInstance = {
 	id: string,
@@ -47,6 +47,13 @@ export type Profile = {
 	arcs: { [string]: ArcProgress },
 	npcs: { [string]: { blocked: boolean?, reported: boolean? } },
 	learning: { topicsSeen: { [string]: boolean }, toolsPracticed: { [string]: boolean } },
+	-- v3: the practice-story campaign. Private, never sent to the client
+	-- (see PlayerDataService.snapshot). Shapes are owned and normalized by
+	-- Logic/LearningProgress and Logic/EncounterScheduler on load.
+	learningV2: { [string]: any },
+	campaign: { [string]: any },
+	show: { completed: boolean, ribbon: boolean },
+	visibleTitle: string?, -- the one learning-derived field others may see (owner decision)
 	stats: { sessions: number, firstJoin: number },
 }
 
@@ -65,6 +72,19 @@ function ProfileSchema.default(now: number?): Profile
 		arcs = {},
 		npcs = {},
 		learning = { topicsSeen = {}, toolsPracticed = {} },
+		learningV2 = {
+			rulesVersion = 1,
+			evidence = {},
+			encountered = {},
+			seenFacts = {},
+			toldCara = {},
+			toldLee = {},
+			needsCoaching = {},
+			review = { setIndex = 1, presented = {}, firstAttempt = {}, best = {} },
+			titles = {},
+		},
+		campaign = { version = 1, onboarded = false, completedActivities = 0, beats = {} },
+		show = { completed = false, ribbon = false },
 		stats = { sessions = 0, firstJoin = now or 0 },
 	}
 end
@@ -81,6 +101,12 @@ local migrations: { [number]: (any) -> any } = {
 			pet.bond = nil
 			pet.xpLog = pet.xpLog or { day = 0, counts = {} }
 		end
+		return data
+	end,
+	-- v2 -> v3: adds the campaign and learning state (filled with defaults by
+	-- reconcile). Old `learning` booleans are kept but never converted into
+	-- evidence: nobody gets credit they didn't earn in the new model.
+	[2] = function(data)
 		return data
 	end,
 }

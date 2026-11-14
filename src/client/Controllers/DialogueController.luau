@@ -104,11 +104,23 @@ local function hide()
 	end
 end
 
+-- Closes the conversation the way the Walk away button does, so the server
+-- records the exit (used when another panel takes over).
+function Dialogue.close()
+	if current then
+		send(Remotes.RequestKinds.DialogueClose, { sessionId = current.sessionId })
+	end
+end
+
 function Dialogue.isOpen(): boolean
 	return current ~= nil
 end
 
 function Dialogue.start(gui: ScreenGui)
+	task.defer(function()
+		-- The server runs dialogue sessions itself, so this panel is coordinated but not reported.
+		require(script.Parent.PanelCoordinator).track("dialogue", panel, Dialogue.close, false)
+	end)
 	panel = new("Frame", {
 		Name = "Dialogue",
 		AnchorPoint = Vector2.new(0.5, 1),

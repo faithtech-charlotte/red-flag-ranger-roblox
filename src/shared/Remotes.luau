@@ -38,6 +38,7 @@ Remotes.RequestKinds = {
 	DialogueSafety = "dialogueSafety",
 	RequestHelp = "requestHelp",
 	Unblock = "unblock",
+	PanelState = "panelState", -- client-only panel opened/closed (suppresses story invitations only)
 }
 
 -- Server -> client push kinds.
