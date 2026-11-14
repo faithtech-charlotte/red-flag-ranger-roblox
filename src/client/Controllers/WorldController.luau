@@ -6,6 +6,7 @@
 	* Blocked NPCs disappear for you only (the server also refuses to start
 	  conversations with them).
 	* Fetch button (in the Dog Park) and agility timer.
+	* Wrap-around edges: walking off the map puts you on the opposite side.
 ]]
 
 local CollectionService = game:GetService("CollectionService")
@@ -17,6 +18,7 @@ local UserInputService = game:GetService("UserInputService")
 local Places = require(ReplicatedStorage.Shared.Places)
 local QuestCatalog = require(ReplicatedStorage.Shared.Catalogs.QuestCatalog)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local WorldBounds = require(ReplicatedStorage.Shared.WorldBounds)
 local State = require(script.Parent.State)
 local Theme = require(script.Parent.Parent.UI.Theme)
 
@@ -205,6 +207,46 @@ local function updateActivityUI()
 	end
 end
 
+-- A dog this close to you is following you, so it wraps with you. Matches
+-- PetService's TELEPORT_DISTANCE: farther than that, the server re-homes it.
+local PET_CARRY_DISTANCE = 45
+
+local function ownPet(): Model?
+	for _, model in CollectionService:GetTagged("Pet") do
+		if model:IsA("Model") and model:GetAttribute("OwnerUserId") == player.UserId then
+			return model
+		end
+	end
+	return nil
+end
+
+-- The client owns its character's physics, so wrapping here is instant and
+-- smooth. Rotation and velocity are kept so running carries straight through.
+-- The client also owns its dog's physics, so the dog is moved by the same jump;
+-- otherwise its AlignPosition would drag it ~500 studs across the map.
+local function wrapCharacter()
+	local character = player.Character
+	local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if not character or not hrp then
+		return
+	end
+	local from = hrp.Position
+	local wrapped = WorldBounds.wrap(from)
+	if not wrapped then
+		return
+	end
+	character:PivotTo(CFrame.new(wrapped) * hrp.CFrame.Rotation)
+
+	local pet = ownPet()
+	if pet then
+		local pivot = pet:GetPivot()
+		-- A dog off fetching a ball stays put; it isn't following you.
+		if (pivot.Position - from).Magnitude <= PET_CARRY_DISTANCE then
+			pet:PivotTo(pivot + (wrapped - from))
+		end
+	end
+end
+
 function WorldController.start(gui: ScreenGui, controllers)
 	hud = controllers.HUD
 	dialogue = controllers.Dialogue
@@ -245,6 +287,7 @@ function WorldController.start(gui: ScreenGui, controllers)
 
 	local acc = 0
 	RunService.Heartbeat:Connect(function(dt)
+		wrapCharacter()
 		acc += dt
 		if acc >= 0.1 then
 			acc = 0

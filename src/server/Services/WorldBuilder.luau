@@ -11,11 +11,13 @@
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DogRig = require(ReplicatedStorage.Shared.DogRig)
 local PetCatalog = require(ReplicatedStorage.Shared.Catalogs.PetCatalog)
 local Places = require(ReplicatedStorage.Shared.Places)
+local WorldBounds = require(ReplicatedStorage.Shared.WorldBounds)
 
 local World = {}
 local root: Model
@@ -525,6 +527,7 @@ local function scatter(parent: Instance, rng: Random)
 	local tries = 0
 	while placed < 46 and tries < 600 do
 		tries += 1
+		-- Stay well inside WorldBounds.LANDING so wrapped players never land in a tree.
 		local x, z = rng:NextNumber(-200, 200), rng:NextNumber(-200, 160)
 		local pos = Vector3.new(x, 0, z)
 		local onPath = math.abs(x) < 10 or math.abs(z + 30) < 9
@@ -564,7 +567,8 @@ function World.init(_services)
 	end
 	if baseplate and baseplate:IsA("BasePart") then
 		-- The world is built on a floor whose top is at Y = 0.
-		baseplate.Size = Vector3.new(512, 20, 512)
+		local size = WorldBounds.HALF_SIZE * 2
+		baseplate.Size = Vector3.new(size, 20, size)
 		baseplate.CFrame = CFrame.new(0, -10, 0)
 		baseplate.Color = C.grass
 		baseplate.Material = Enum.Material.Grass
@@ -586,7 +590,26 @@ function World.init(_services)
 	root.Parent = workspace
 end
 
-function World.start() end
+-- Safety net for the wrap-around edges (the client wraps its own character):
+-- anyone who still ends up below the floor is put back on it instead of dying.
+-- (Don't set workspace.FallenPartsDestroyHeight here: scripts can't write it,
+-- and the error would abort every later service's start(). Its default of
+-- -500 is far below RESCUE_HEIGHT anyway.)
+function World.start()
+	task.spawn(function()
+		while true do
+			task.wait(0.5)
+			for _, player in Players:GetPlayers() do
+				local character = player.Character
+				local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
+				if hrp and hrp.Position.Y < WorldBounds.RESCUE_HEIGHT then
+					hrp.AssemblyLinearVelocity = Vector3.zero
+					character:PivotTo(CFrame.new(WorldBounds.rescue(hrp.Position)) * hrp.CFrame.Rotation)
+				end
+			end
+		end
+	end)
+end
 
 function World.getAgilityCourse(): Instance?
 	return root and root:FindFirstChild("Agility", true)
