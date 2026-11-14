@@ -153,6 +153,16 @@ return function(t)
 	end)
 
 	-- Fetch
+	t.test("rolling resistance torque gives the requested slowdown", function()
+		-- Solid sphere rolling without slipping: tau = (I/r + m*r) * a = 1.4*m*r*a
+		local tau = FetchMath.rollingTorque(2, 0.5, 10)
+		expect(math.abs(tau - 14) < 1e-9).toBe(true)
+		-- The ball stops within a sensible distance from a fast roll (v^2 / 2a).
+		expect(FetchMath.rollDistance(30, FetchMath.ROLL_DECEL) < 20).toBe(true)
+		expect(FetchMath.rollDistance(30, FetchMath.ROLL_DECEL) > 5).toBe(true)
+		expect(FetchMath.rollingTorque(-1, 0.5, 10)).toBe(0)
+	end)
+
 	t.test("throws are clamped to a safe distance", function()
 		local origin = Vector3.new(0, 3, 0)
 		local far = FetchMath.clampThrow(origin, Vector3.new(500, 0, 0), Vector3.new(0, 0, -1), 8, 42)

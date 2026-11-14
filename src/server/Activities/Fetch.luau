@@ -128,7 +128,17 @@ local function makeBall(position: Vector3, velocity: Vector3, owner: Player): (B
 	hold.Name = "BallTarget"
 	-- Center of the ball: the ball spins as it rolls, so an offset would orbit.
 	hold.Parent = ball
+	-- Rolling resistance: without it the ball rolls forever on flat ground.
+	-- A constraint (not a script loop) so it still applies while the
+	-- thrower's client owns the ball's physics.
+	local drag = Instance.new("AngularVelocity")
+	drag.Name = "RollingResistance"
+	drag.Attachment0 = hold
+	drag.RelativeTo = Enum.ActuatorRelativeTo.World
+	drag.AngularVelocity = Vector3.zero
+	drag.Parent = ball
 	ball.Parent = workspace
+	drag.MaxTorque = FetchMath.rollingTorque(ball:GetMass(), ball.Size.X / 2, FetchMath.ROLL_DECEL)
 	ball.AssemblyLinearVelocity = velocity
 	ball.AssemblyAngularVelocity = Vector3.new(math.random(-8, 8), 0, math.random(-8, 8))
 	pcall(function()
@@ -326,6 +336,10 @@ function Fetch.throw(player: Player, aim: any, power: any): (boolean, string?)
 
 		-- Grab it.
 		b.Anchored = true
+		local drag = b:FindFirstChild("RollingResistance")
+		if drag then
+			drag:Destroy() -- once welded it would torque the dog instead
+		end
 		local mouth = pet.model:FindFirstChild("MouthAttachment", true) :: Attachment?
 		if mouth then
 			b.Size = Vector3.new(0.8, 0.8, 0.8)
