@@ -272,8 +272,8 @@ Encounters.coach_locked = {
 	nodes = {
 		hi = {
 			speaker = "npc",
-			text = "Welcome! Warm up with a game of fetch at Sunny Dog Park first, then come back and run the course.",
-			choices = { { id = "ok", text = "Will do!", actions = { { action = "show_waypoint", placeId = "dog_park" } } } },
+			text = "Welcome! Adopt a dog at the Pet Store first, then come back and run the course together.",
+			choices = { { id = "ok", text = "Will do!", actions = { { action = "show_waypoint", placeId = "pet_store" } } } },
 		},
 	},
 }

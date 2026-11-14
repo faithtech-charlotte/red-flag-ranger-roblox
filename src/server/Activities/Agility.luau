@@ -55,9 +55,9 @@ local function hook(course: Instance)
 		if not player or not S.Data.get(player) then
 			return
 		end
-		local ok = Activity.canStart(player, "agility")
+		local ok, reason = Activity.canStart(player, "agility")
 		if not ok then
-			hint(player, "Play fetch at Sunny Dog Park first to unlock the course!")
+			hint(player, reason == "Adopt a dog first!" and "Adopt a dog at the Pet Store, then come run the course together!" or (reason or "Not right now."))
 			return
 		end
 		local run = runs[player]
