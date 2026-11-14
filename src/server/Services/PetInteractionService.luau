@@ -27,11 +27,6 @@ local Interaction = {}
 local S
 local readyAt: { [Player]: { [string]: number } } = {} -- server time
 
-local function petName(player: Player): string
-	local model = S.Pet.getModel(player)
-	return model and model:GetAttribute("PetName") or "Your dog"
-end
-
 local function coolingDown(player: Player, key: string): boolean
 	local t = readyAt[player] and readyAt[player][key]
 	return t ~= nil and workspace:GetServerTimeNow() < t
@@ -90,7 +85,7 @@ end
 -- Feeding is shared by the menu and the wardrobe's "Give" button.
 function Interaction.feed(player: Player, food: any): (boolean, string?)
 	if S.Pet.distanceToOwner(player) > PetActions.TOUCH_DISTANCE then
-		return false, `Get closer to {petName(player)} first.`
+		return false, `Get closer to {S.Pet.name(player)} first.`
 	end
 	local item = nil
 	if food ~= PetActions.FreeFood.id then
@@ -100,6 +95,10 @@ function Interaction.feed(player: Player, food: any): (boolean, string?)
 		end
 		if not S.Inventory.owns(player, item.id) then
 			return false, `You're out of {item.name}. The Treat Shop has more!`
+		end
+		-- Don't spend a treat that would give no Bond XP.
+		if S.Bond.coolingDown(player, "feed_treat") then
+			return false, `{S.Pet.name(player)} is still full. Try again in a few seconds!`
 		end
 	elseif coolingDown(player, "kibble") then
 		return false, "The kibble bowl is refilling."
@@ -162,8 +161,8 @@ local function endPetting(player: Player)
 	local session = petting[player]
 	petting[player] = nil
 	local model = S.Pet.getModel(player)
-	if model then
-		model:SetAttribute("Joy", 0)
+	if model and (model:GetAttribute("Joy") or 0) ~= 0 then
+		model:SetAttribute("Joy", 0) -- skip the replicated write when nothing changes
 	end
 	if session and S.Pet.getState(player) == "BeingPetted" then
 		S.Pet.settle(player)
@@ -172,7 +171,7 @@ end
 
 handlers.petStart = function(player)
 	if S.Pet.distanceToOwner(player) > PetActions.TOUCH_DISTANCE then
-		return false, `Get closer to {petName(player)} first.`
+		return false, `Get closer to {S.Pet.name(player)} first.`
 	end
 	S.Activity.interrupt(player, "petting")
 	local ok, reason, token = S.Pet.setState(player, "BeingPetted", {})
@@ -214,11 +213,6 @@ handlers.petStroke = function(player, payload)
 		S.Net.push(player, Remotes.PushKinds.Petted, { xp = gained })
 		S.Data.pushState(player)
 	end
-	return true, nil
-end
-
-handlers.petEnd = function(player)
-	endPetting(player)
 	return true, nil
 end
 
@@ -301,7 +295,7 @@ local function handle(player: Player, payload: any): (boolean, string?)
 			return false, `{def.label} unlocks at Bond Level {need}.`
 		end
 		if def.touch and S.Pet.distanceToOwner(player) > PetActions.TOUCH_DISTANCE then
-			return false, `Get closer to {petName(player)} first.`
+			return false, `Get closer to {S.Pet.name(player)} first.`
 		end
 		if def.cooldown > 0 and coolingDown(player, def.id) then
 			return false, nil
@@ -311,7 +305,7 @@ local function handle(player: Player, payload: any): (boolean, string?)
 	if ok and def and def.cooldown > 0 then
 		startCooldown(player, def.id, def.cooldown)
 	end
-	local quiet = { attend = true, dismiss = true, feed = true, petStart = true, petStroke = true, petEnd = true }
+	local quiet = { attend = true, dismiss = true, feed = true, petStart = true, petStroke = true }
 	if ok and not quiet[action] then -- feed and petting publish their own events
 		EventBus.publish("pet.interacted", player, { action = action, trick = payload.trick })
 		S.Data.pushState(player)
@@ -325,8 +319,13 @@ end
 
 function Interaction.start()
 	S.Net.on(Remotes.RequestKinds.PetAction, handle, 0.15)
-	-- Ending is idempotent and must work even immediately after a petStroke.
-	S.Net.on(Remotes.RequestKinds.PetEnd, handlers.petEnd, 0)
+	-- Ending has its own request kind (not PetAction) so it's never dropped by
+	-- PetAction's rate limit right after a petStroke. Its own small limit only
+	-- stops spam; with no session it does nothing.
+	S.Net.on(Remotes.RequestKinds.PetEnd, function(player)
+		endPetting(player)
+		return true, nil
+	end, 0.05)
 	Players.PlayerRemoving:Connect(function(player)
 		readyAt[player] = nil
 		petting[player] = nil

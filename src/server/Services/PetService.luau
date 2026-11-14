@@ -56,6 +56,9 @@ type Active = {
 local Pet = {}
 local S
 local active: { [Player]: Active } = {}
+-- Bumped on every spawn/despawn. A spawn that yielded (name filtering) and
+-- finds the number changed has been superseded and must not build a dog.
+local spawnGen: { [Player]: number } = {}
 local petsFolder: Folder
 
 -- Returns ("ok" | "rejected" | "unavailable", filteredText?)
@@ -134,6 +137,7 @@ local function applyMovement(a: Active, target: Attachment?)
 end
 
 function Pet.despawn(player: Player)
+	spawnGen[player] = (spawnGen[player] or 0) + 1
 	local a = active[player]
 	if a then
 		active[player] = nil
@@ -146,6 +150,7 @@ end
 
 function Pet.spawn(player: Player)
 	Pet.despawn(player)
+	local gen = spawnGen[player]
 	local profile = S.Data.get(player)
 	local pet = profile and ProfileSchema.activePet(profile)
 	local character = player.Character
@@ -161,6 +166,9 @@ function Pet.spawn(player: Player)
 		pet.displayName = text :: string
 	elseif status == "rejected" then
 		pet.displayName = breed.defaultNames[1]
+	end
+	if spawnGen[player] ~= gen or not player.Parent then
+		return -- another spawn/despawn ran while we were filtering
 	end
 	if player.Character ~= character or not hrp.Parent then
 		return -- respawned while we were filtering
@@ -234,6 +242,12 @@ end
 function Pet.getModel(player: Player): Model?
 	local a = active[player]
 	return a and a.model
+end
+
+-- The dog's (filtered) display name, for messages.
+function Pet.name(player: Player): string
+	local model = Pet.getModel(player)
+	return model and model:GetAttribute("PetName") or "Your dog"
 end
 
 function Pet.getActive(player: Player): Active?
@@ -413,8 +427,7 @@ local function monitor()
 			a.root.AssemblyLinearVelocity = Vector3.zero
 		elseif StateMachine.isBase(a.state) and a.state ~= "Following" and distance > STAY_RECALL_DISTANCE then
 			Pet.setState(player, "Following", { force = true })
-			local name = a.model:GetAttribute("PetName") or "Your dog"
-			S.Net.toast(player, `{name} missed you and came running!`, "info")
+			S.Net.toast(player, `{Pet.name(player)} missed you and came running!`, "info")
 		elseif StateMachine.isTemporary(a.state) and distance > INTERACTION_LEASH then
 			Pet.settle(player) -- owner walked away mid-interaction
 		end
@@ -446,7 +459,10 @@ function Pet.start()
 	for _, player in Players:GetPlayers() do
 		hook(player)
 	end
-	Players.PlayerRemoving:Connect(Pet.despawn)
+	Players.PlayerRemoving:Connect(function(player)
+		Pet.despawn(player)
+		spawnGen[player] = nil
+	end)
 	-- Profile may finish loading after the character exists.
 	S.Data.onLoaded(function(player)
 		if player.Character then
