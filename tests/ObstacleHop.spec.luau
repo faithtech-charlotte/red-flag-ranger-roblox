@@ -98,6 +98,16 @@ return function(t)
 		expect(ObstacleHop.height({ hurdle }, Vector3.new(20, 1.5, 0), Vector3.zero, 0, true, cfg)).toBe(0)
 	end)
 
+	t.test("height drops a hop when beside, not over, a rail", function()
+		local beside = Vector3.new(10 + 0.3 + 1.5, 1.5, 0) -- inside the pad, not over the bar
+		expect(ObstacleHop.height({ hurdle }, beside, Vector3.new(0, 0, 10), 0, true, cfg)).toBe(0)
+	end)
+
+	t.test("thin posts are not crossed just by running past", function()
+		local post = Vector3.new(0.6, 3.2, 0.6)
+		expect(ObstacleHop.crossing(Vector3.new(0, 0, 10), CFrame.new(), post, 2)).toBe(false)
+	end)
+
 	t.test("height is capped so the dog never flies", function()
 		local tower = { cf = CFrame.new(10, 10, 0), size = Vector3.new(1, 20, 1) }
 		expect(ObstacleHop.height({ tower }, Vector3.new(10, 1.5, 0), runX, 0, false, cfg)).toBe(4.5)

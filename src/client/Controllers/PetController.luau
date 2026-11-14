@@ -386,6 +386,17 @@ local function groundY(at: Vector3, extra: Instance?): number?
 	if pets then
 		table.insert(ignore, pets)
 	end
+	-- Other players and NPCs aren't ground either: dog parts don't collide, so
+	-- a dog walking through someone would otherwise climb onto them.
+	for _, other in Players:GetPlayers() do
+		if other ~= player and other.Character then
+			table.insert(ignore, other.Character)
+		end
+	end
+	local npcs = workspace:FindFirstChild("NPCs")
+	if npcs then
+		table.insert(ignore, npcs)
+	end
 	-- The target stays on the ground under an obstacle; the dog hops it.
 	groundParams.FilterDescendantsInstances = ObstacleHop.groundIgnore(ignore)
 	local hit = workspace:Raycast(at + Vector3.new(0, 1, 0), Vector3.new(0, -40, 0), groundParams)

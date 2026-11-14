@@ -67,14 +67,18 @@ end
 
 -- Whether something moving at `vel` is crossing the box rather than
 -- standing still or running alongside it. Long boxes (rails, bars, benches)
--- must be crossed along their thin axis; roundish ones (a ball) any way.
+-- must be crossed along their thin axis; roundish ones (a ball) any way,
+-- unless they are thin posts, which are never crossed on their own.
 function ObstacleHop.crossing(vel: Vector3, cf: CFrame, size: Vector3, minSpeed: number): boolean
 	local flat = Vector3.new(vel.X, 0, vel.Z)
 	if flat.Magnitude < minSpeed then
 		return false
 	end
-	if math.max(size.X, size.Z) < 1.5 * math.min(size.X, size.Z) then
-		return true
+	local short = math.min(size.X, size.Z)
+	if math.max(size.X, size.Z) < 1.5 * short then
+		-- Thin posts (fences, hurdles) are run past, not crossed; treating them
+		-- as crossable makes the dog hop at every post along a fence.
+		return short >= 1
 	end
 	local thin = size.X < size.Z and cf.XVector or cf.ZVector
 	local thinFlat = Vector3.new(thin.X, 0, thin.Z)
@@ -88,8 +92,8 @@ end
 	How high a dog at `pos` moving at `vel` should be lifted right now, given
 	nearby obstacles. A hop starts only when the dog is crossing an obstacle
 	(checked at `pos` and a look-ahead point). Once `hopping`, it continues
-	while the dog is still over the obstacle, so it never drops into the bar
-	halfway across. Capped at cfg.maxLift.
+	while the dog is still (nearly) over the obstacle, so it never drops into
+	the bar halfway across. Capped at cfg.maxLift.
 ]]
 function ObstacleHop.height(obstacles: { Box }, pos: Vector3, vel: Vector3, feetY: number, hopping: boolean, cfg: Config?): number
 	local c = cfg or ObstacleHop.DEFAULTS
@@ -100,7 +104,9 @@ function ObstacleHop.height(obstacles: { Box }, pos: Vector3, vel: Vector3, feet
 		local h = 0
 		if ObstacleHop.crossing(vel, o.cf, o.size, c.minSpeed) then
 			h = math.max(here, ObstacleHop.lift(ahead, feetY, o.cf, o.size, c.pad, c.margin))
-		elseif hopping then
+		elseif hopping and ObstacleHop.lift(pos, feetY, o.cf, o.size, math.min(c.pad, 0.5), c.margin) > 0 then
+			-- Finish a hop only while (nearly) over the obstacle, so a dog beside a
+			-- rail, moving along it or stopped, comes back down.
 			h = here
 		end
 		best = math.max(best, h)
