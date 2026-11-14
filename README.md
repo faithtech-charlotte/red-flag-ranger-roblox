@@ -16,6 +16,22 @@ A Roblox pet adventure (ages 9 to 13) built for the FaithTech hackathon with Pre
 
 **Tests:** the pure logic (encounter engine, purchases, profile migrations, conditions, catalogs) has unit tests in `tests/`. In Studio's command bar: `print(require(game.ServerStorage.Tests)())`
 
+### Optional: Roblox skill for Claude Code
+
+If you use [Claude Code](https://claude.com/claude-code), install the community [roblox-game skill](https://github.com/brockmartin/roblox-game-skill) once per machine. It isn't bundled in this repo because it has no license yet. It installs as a personal skill, so it works in every project:
+
+```bash
+# macOS / Linux / Git Bash
+git clone https://github.com/brockmartin/roblox-game-skill ~/.claude/skills/roblox-game
+```
+
+```powershell
+# Windows PowerShell
+git clone https://github.com/brockmartin/roblox-game-skill "$HOME\.claude\skills\roblox-game"
+```
+
+Restart Claude Code afterward. Check that it loaded by running `/roblox-game` (or `/skills`). To update it, run `git -C ~/.claude/skills/roblox-game pull`. Where its generic advice conflicts with this project, `CLAUDE.md` wins.
+
 ## The 10-minute path
 
 | Step | Where | What happens |
@@ -37,6 +53,7 @@ A yellow beam points to the next Ranger Journal objective.
 | **Actions** | Pet, Feed (free kibble every 45 s, or treats), Fetch, Brush, Sit, Stay (Bond Level 2), Come, Tricks (Spin at 3, High-five at 5, Play Bow at 6, Zoomies at 8). |
 | **Bond XP** | Earned from petting, feeding, fetch, brushing, tricks, the spa, training, and activities. Per-source cooldowns plus a soft daily cap (full XP, then half, then 0). Bond never goes down. Level 10 gives the Best Friend Collar. All numbers are in `src/shared/Catalogs/BondCatalog.luau`. |
 | **Fetch** | Aim and throw: point and click, tap the ground, or aim with the camera (gamepad RT). Works anywhere. 3 catches in Sunny Dog Park complete the park challenge. Balls that land on roofs or out of bounds "poof" and you get a new one. |
+| **Frisbee Catch** | Frisbee Field, east of the Training Grounds. "Grab a frisbee" at the stack by the throwing line: your dog runs out and waits. Hold to wind up, release to throw; aim up for a higher, floatier throw. The disc flies with real disc aerodynamics (lift, drag, and the turn-and-fade of a spinning disc; `src/shared/FrisbeeMath.luau`). The dog sprints to where the disc will come down and leaps for it. Only mid-air catches count; it still brings back the ones that land, then runs out again. 3 catches complete the game (same coins as fetch). Walking away, the whistle, or Stop ends it. |
 | **Spa (Wash & Groom)** | Grooming tubs at the salon. Four hands-on gestures (`Client/Controllers/GroomingGestures`): brush (drag along the back), wash (scrub in circles to fill the suds meter), rinse (sweep across), dry (hold). Mouse, touch, or gamepad (hold A, steer with the stick; A or Space alone works the tool by itself). The server checks the run id, step order, 25/50/75/100 % milestones and timing (`Logic/GroomRules`) and gives a 1-3 star shine. Your dog sparkles afterward. |
 | **Trail Walk** | The Meadow Trail, a public loop west of the dog park (follow the connector path along the park's north fence). Start at the trailhead; the leash clips on. Walk past 10 paw prints in order, sniff spots give a bonus. 2-3 times a squirrel darts out: hold Space / left mouse, the big HOLD button (touch) or R2 / A to keep the leash steady. A miss is fine: the dog tugs a few steps off the path and comes back. 1-3 trail stars from the server (`Logic/TrailRules`). |
 | **Trick training** | Training mat at the Training Grounds. Press when the marker is in the green zone; the server does the timing. Gets harder each time you finish. |

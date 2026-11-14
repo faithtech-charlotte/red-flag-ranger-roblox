@@ -31,6 +31,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Places = require(ReplicatedStorage.Shared.Places)
+local ObstacleHop = require(ReplicatedStorage.Shared.ObstacleHop)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local TrailRules = require(script.Parent.Parent.Logic.TrailRules)
 
@@ -82,7 +83,9 @@ local function groundY(x: number, z: number): number
 			table.insert(ignore, entry.squirrel)
 		end
 	end
-	params.FilterDescendantsInstances = ignore
+	-- The ground under a fence or bench, not its top (and never a blocker).
+	params.FilterDescendantsInstances = ObstacleHop.groundIgnore(ignore)
+	params.RespectCanCollide = true
 	local hit = workspace:Raycast(Vector3.new(x, 30, z), Vector3.new(0, -60, 0), params)
 	return hit and hit.Position.Y or 0
 end

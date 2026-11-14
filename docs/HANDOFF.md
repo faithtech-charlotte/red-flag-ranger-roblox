@@ -45,3 +45,12 @@ Work is on **`worktree-trackb-integrate`** (worktree `.claude/worktrees/trackb-i
 - Who reviews the dialogue, and when: undecided.
 - Solo vs shared servers: build shared-safe; decide at publish.
 - Owner may want to tune Track B scoring: shine base (2 stars if steps average ≤12 s), evenness ±1 star at ≥0.7/≤0.3, trail score 0.6 holds + 0.3 time vs par (60 s) + 0.1 sniffs.
+
+## From main: jumping obstacles (merged 2026-11-14, PR #11)
+
+- **Player:** benches, fences and hurdles were already collidable but low enough to step over. `WorldBuilder` now adds invisible `PlayerBlocker` walls (3.2 to 3.4 studs, collision group `PlayerBlocker`, collides with `Characters` only), so the player has to jump them.
+- **Dog:** the visible parts are tagged `JumpObstacle`. `PetController` lifts the dog's body over them using `Shared/ObstacleHop` (animation only: the root stays on the ground, on every client). Ground and aim raycasts exclude both tags, so the follow target no longer climbs onto benches and rails.
+- **Not played yet.** The code was written without a Studio session; only `rojo build` was run. Check: `ObstacleHop.spec` passes; you are stopped by and can jump each obstacle; the dog hops when crossing and not when running alongside a fence; the fetch ball ignores blockers; agility medal times still feel fair now that hurdles need a jump; touch auto-jump on blockers.
+- **Dog sinking when you jump:** the follow target rides your character during the physics step, so the dog rose with a jump and dipped under the floor on the way down. `PetController.keepOnGround` now puts a Following/Returning dog back on the ground under its own feet after every physics step (owner client only). Not played yet.
+- A hand-built `Workspace.World` needs its own tags and blockers. Trees, lamp posts, weave poles and buildings are unchanged (the dog still passes through them).
+

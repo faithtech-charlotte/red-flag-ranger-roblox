@@ -34,6 +34,7 @@ local EventBus = require(script.Parent.Parent.Core.EventBus)
 local ProfileSchema = require(script.Parent.Parent.Data.ProfileSchema)
 local StateMachine = require(script.Parent.Parent.Logic.PetStateMachine)
 local DogRig = require(ReplicatedStorage.Shared.DogRig)
+local ObstacleHop = require(ReplicatedStorage.Shared.ObstacleHop)
 local PetCatalog = require(ReplicatedStorage.Shared.Catalogs.PetCatalog)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
@@ -97,7 +98,8 @@ end
 local function groundOffset(character: Model, hrp: BasePart, scale: number): number
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
-	params.FilterDescendantsInstances = { character, petsFolder }
+	params.RespectCanCollide = true -- not trigger volumes or decorations
+	params.FilterDescendantsInstances = ObstacleHop.groundIgnore({ character, petsFolder })
 	local hit = workspace:Raycast(hrp.Position, Vector3.new(0, -20, 0), params)
 	local distance = hit and (hrp.Position.Y - hit.Position.Y) or 3
 	return -distance + DogRig.GROUND_OFFSET * scale

@@ -13,10 +13,12 @@
 
 local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
+local PhysicsService = game:GetService("PhysicsService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DogRig = require(ReplicatedStorage.Shared.DogRig)
+local ObstacleHop = require(ReplicatedStorage.Shared.ObstacleHop)
 local PetCatalog = require(ReplicatedStorage.Shared.Catalogs.PetCatalog)
 local Places = require(ReplicatedStorage.Shared.Places)
 local WorldBounds = require(ReplicatedStorage.Shared.WorldBounds)
@@ -64,6 +66,30 @@ local function block(parent, name, size: Vector3, x, y, z, color, extra: { [stri
 		props[k] = v
 	end
 	return part(parent, props)
+end
+
+-- Marks a visible part as something the dog hops over (see ObstacleHop).
+local function obstacle(p: BasePart): BasePart
+	CollectionService:AddTag(p, ObstacleHop.JUMP_TAG)
+	return p
+end
+
+-- An invisible wall that only player characters collide with. Low obstacles
+-- can otherwise be stepped over; this makes the player jump them. Keep it
+-- taller than a step (about 2 studs) and well under a jump (about 7).
+local function blocker(parent: Instance, cf: CFrame, size: Vector3): BasePart
+	local p = part(parent, {
+		Name = "PlayerBlocker",
+		Size = size,
+		CFrame = cf,
+		Transparency = 1,
+		CanTouch = false,
+		CanQuery = false,
+		CastShadow = false,
+		CollisionGroup = ObstacleHop.BLOCKER_GROUP,
+	})
+	CollectionService:AddTag(p, ObstacleHop.BLOCKER_TAG)
+	return p
 end
 
 local function folder(name: string, parent: Instance): Model
@@ -130,10 +156,17 @@ end
 local function bench(parent: Instance, x: number, z: number, rotY: number)
 	local m = folder("Bench", parent)
 	local base = CFrame.new(x, 0, z) * CFrame.Angles(0, math.rad(rotY), 0)
-	part(m, { Name = "Seat", Size = Vector3.new(6, 0.4, 2), CFrame = base * CFrame.new(0, 1.6, 0), Color = C.wood })
-	part(m, { Name = "Back", Size = Vector3.new(6, 1.6, 0.3), CFrame = base * CFrame.new(0, 2.6, 0.9), Color = C.wood })
+	obstacle(part(m, { Name = "Seat", Size = Vector3.new(6, 0.4, 2), CFrame = base * CFrame.new(0, 1.6, 0), Color = C.wood }))
+	obstacle(part(m, { Name = "Back", Size = Vector3.new(6, 1.6, 0.3), CFrame = base * CFrame.new(0, 2.6, 0.9), Color = C.wood }))
 	for _, sx in { -2.6, 2.6 } do
-		part(m, { Name = "Leg", Size = Vector3.new(0.3, 1.4, 1.8), CFrame = base * CFrame.new(sx, 0.7, 0), Color = C.dark })
+		obstacle(part(m, { Name = "Leg", Size = Vector3.new(0.3, 1.4, 1.8), CFrame = base * CFrame.new(sx, 0.7, 0), Color = C.dark }))
+	end
+	-- Thin walls along the front and both ends (the back already blocks), so
+	-- the player jumps onto the seat instead of stepping up, and stands on
+	-- the seat itself rather than on an invisible box.
+	blocker(m, base * CFrame.new(0, 1.7, -0.9), Vector3.new(6, 3.4, 0.2))
+	for _, sx in { -2.9, 2.9 } do
+		blocker(m, base * CFrame.new(sx, 1.7, 0), Vector3.new(0.2, 3.4, 2))
 	end
 end
 
@@ -143,17 +176,19 @@ local function fenceLine(parent: Instance, a: Vector3, b: Vector3, color: Color3
 	local n = math.max(1, math.floor(len / 6))
 	for i = 0, n do
 		local p = a + dir * (i / n)
-		part(parent, { Name = "Post", Size = Vector3.new(0.6, 3.2, 0.6), CFrame = CFrame.new(p.X, 1.6, p.Z), Color = color })
+		obstacle(part(parent, { Name = "Post", Size = Vector3.new(0.6, 3.2, 0.6), CFrame = CFrame.new(p.X, 1.6, p.Z), Color = color }))
 	end
 	local mid = (a + b) / 2
 	for _, y in { 1.2, 2.5 } do
-		part(parent, {
+		obstacle(part(parent, {
 			Name = "Rail",
 			Size = Vector3.new(0.3, 0.4, len),
 			CFrame = CFrame.lookAt(Vector3.new(mid.X, y, mid.Z), Vector3.new(b.X, y, b.Z)),
 			Color = color,
-		})
+		}))
 	end
+	-- Fills the gaps between the rails so the player can't climb the fence.
+	blocker(parent, CFrame.lookAt(Vector3.new(mid.X, 1.6, mid.Z), Vector3.new(b.X, 1.6, b.Z)), Vector3.new(0.6, 3.2, len))
 end
 
 -- Four-walled building with a door gap on one side. `door` is "north" (-Z),
@@ -391,12 +426,13 @@ end
 local function hurdle(parent: Instance, x: number, z: number, alongX: boolean)
 	local width = 8
 	local bar = alongX and Vector3.new(0.6, 0.6, width) or Vector3.new(width, 0.6, 0.6)
-	block(parent, "HurdleBar", bar, x, 1.2, z, C.red)
-	block(parent, "HurdleBase", alongX and Vector3.new(0.6, 1.2, width) or Vector3.new(width, 1.2, 0.6), x, 0, z, C.white, { Transparency = 0.2 })
+	obstacle(block(parent, "HurdleBar", bar, x, 1.2, z, C.red))
+	obstacle(block(parent, "HurdleBase", alongX and Vector3.new(0.6, 1.2, width) or Vector3.new(width, 1.2, 0.6), x, 0, z, C.white, { Transparency = 0.2 }))
+	blocker(parent, CFrame.new(x, 1.6, z), alongX and Vector3.new(0.6, 3.2, width) or Vector3.new(width, 3.2, 0.6))
 	for _, s in { -1, 1 } do
 		local px = alongX and x or x + s * width / 2
 		local pz = alongX and z + s * width / 2 or z
-		block(parent, "HurdlePost", Vector3.new(0.6, 2.4, 0.6), px, 0, pz, C.white)
+		obstacle(block(parent, "HurdlePost", Vector3.new(0.6, 2.4, 0.6), px, 0, pz, C.white))
 	end
 end
 
@@ -477,7 +513,7 @@ local function buildAgility(parent: Instance)
 			block(finish, "Check", Vector3.new(2, 0.3, 2.25), -33 + i * 2, 0.15, -140.5 + j * 2.25, (i + j) % 2 == 0 and C.white or C.dark, { CanCollide = false })
 		end
 	end
-	block(m, "AgilityFinish", Vector3.new(8, 4, 9), -30, 0.1, -136, C.white, { Transparency = 1, CanCollide = false })
+	block(m, "AgilityFinish", Vector3.new(8, 4, 9), -30, 0.1, -136, C.white, { Transparency = 1, CanCollide = false, CanQuery = false })
 	sign(m, "FINISH", CFrame.new(-30, 7, -141) * CFrame.Angles(0, math.rad(180), 0), Vector2.new(6, 1.8), C.dark)
 
 	sign(m, "Training Grounds", CFrame.new(-20, 8, -89) * CFrame.Angles(0, math.rad(180), 0), Vector2.new(14, 2.6), C.blue)
@@ -633,6 +669,58 @@ function World.getTrail(): Instance?
 	return root and root:FindFirstChild("Trail", true)
 end
 
+-- Frisbee Field, east of the Training Grounds. Players throw from the line
+-- at the west end toward +X. Markings don't collide or block raycasts, so
+-- the disc flies over them; only real obstacles (trees, buildings) stop it.
+local function buildFrisbeeField(parent: Instance)
+	local p = Places.get("frisbee_field") :: Places.Place
+	local m = folder("FrisbeeField", parent)
+	local hx, hz = p.size.X / 2, p.size.Z / 2
+	local x0, x1, z0, z1 = p.center.X - hx, p.center.X + hx, p.center.Z - hz, p.center.Z + hz
+	local mark = { CanCollide = false, CanQuery = false, CanTouch = false, CastShadow = false }
+	block(m, "Lawn", Vector3.new(p.size.X, 0.2, p.size.Z), p.center.X, 0, p.center.Z, C.grassLight, { Material = Enum.Material.Grass })
+	-- Mowing stripes
+	for i = 0, math.floor(p.size.X / 8) - 1, 2 do
+		block(m, "Stripe", Vector3.new(8, 0.21, p.size.Z), x0 + 4 + i * 8, 0, p.center.Z, C.grass, { Material = Enum.Material.Grass, CanCollide = false, CanQuery = false, CanTouch = false })
+	end
+	local lineX = x0 + 6
+	block(m, "ThrowLine", Vector3.new(0.6, 0.24, p.size.Z - 6), lineX, 0, p.center.Z, C.white, mark)
+	-- Distance markers every 20 studs: cones at both sidelines and a number.
+	for i, d in { 20, 40, 60 } do
+		local x = lineX + d
+		block(m, "DistanceLine", Vector3.new(0.4, 0.23, p.size.Z - 6), x, 0, p.center.Z, C.white, { CanCollide = false, CanQuery = false, CanTouch = false, CastShadow = false, Transparency = 0.5 })
+		for _, z in { z0 + 2, z1 - 2 } do
+			block(m, "Cone", Vector3.new(1, 1.4, 1), x, 0, z, C.orange, mark)
+		end
+		sign(m, `{d}`, CFrame.new(x, 2.6, z1 - 2) * CFrame.Angles(0, math.rad(180), 0), Vector2.new(2.4, 1.4), ({ C.yellow, C.orange, C.red })[i])
+	end
+	for _, corner in { Vector3.new(x0, 0, z0), Vector3.new(x0, 0, z1), Vector3.new(x1, 0, z0), Vector3.new(x1, 0, z1) } do
+		block(m, "FlagPole", Vector3.new(0.3, 5, 0.3), corner.X, 0, corner.Z, C.white)
+		block(m, "Flag", Vector3.new(0.1, 1.2, 1.8), corner.X, 3.7, corner.Z + 0.9, C.pink, { CanCollide = false })
+	end
+	sign(m, "🥏 Frisbee Field", CFrame.new(x0 - 2, 7, p.center.Z + 10) * CFrame.Angles(0, math.rad(90), 0), Vector2.new(13, 2.6), C.pink)
+	block(m, "SignPost", Vector3.new(0.5, 6, 0.5), x0 - 2, 0, p.center.Z + 10, C.wood)
+
+	-- The frisbee stack: "Grab a frisbee" starts the game.
+	local tx, tz = x0 + 3, p.center.Z - 8
+	block(m, "FrisbeeTable", Vector3.new(3, 2.4, 3), tx, 0, tz, C.wood)
+	local colors = { C.pink, C.yellow, C.blue, C.green }
+	for i, color in colors do
+		part(m, {
+			Name = "StackedFrisbee",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(0.25, 2, 2),
+			CFrame = CFrame.new(tx, 2.53 + (i - 1) * 0.26, tz) * CFrame.Angles(0, 0, math.rad(90)),
+			Color = color,
+			CanCollide = false,
+		})
+	end
+	local station = block(m, "FrisbeeStation", Vector3.new(3.2, 3.6, 3.2), tx, 0, tz, C.white, { Transparency = 1, CanCollide = false })
+	CollectionService:AddTag(station, "FrisbeeStation")
+	sign(m, "🥏 Grab a frisbee!", CFrame.new(tx, 5.2, tz) * CFrame.Angles(0, math.rad(90), 0), Vector2.new(5, 1.1), C.pink)
+	bench(m, x0 + 3, p.center.Z + 6, 90)
+end
+
 local function buildPaths(parent: Instance)
 	local m = folder("Paths", parent)
 	block(m, "Avenue", Vector3.new(10, 0.15, 124), 0, 0, -28, C.path)
@@ -700,8 +788,23 @@ local function applyLighting()
 	Lighting.Ambient = Color3.fromRGB(40, 40, 48)
 end
 
+-- PlayerBlocker parts collide with characters only. Registered before the
+-- world is built (and for hand-built worlds too) so parts can join the group.
+local function setUpBlockerGroup()
+	local group = ObstacleHop.BLOCKER_GROUP
+	pcall(function()
+		PhysicsService:RegisterCollisionGroup(group)
+	end)
+	for _, other in { "Default", group } do
+		pcall(function()
+			PhysicsService:CollisionGroupSetCollidable(group, other, false)
+		end)
+	end
+end
+
 function World.init(_services)
 	applyLighting()
+	setUpBlockerGroup()
 	local existing = workspace:FindFirstChild("World")
 	if existing then
 		root = existing :: Model
@@ -735,6 +838,7 @@ function World.init(_services)
 	buildSalon(root)
 	buildAgility(root)
 	buildTrail(root)
+	buildFrisbeeField(root)
 	scatter(root, rng)
 	root.Parent = workspace
 end
@@ -745,6 +849,10 @@ end
 -- and the error would abort every later service's start(). Its default of
 -- -500 is far below RESCUE_HEIGHT anyway.)
 function World.start()
+	-- Fetch registers its ball group in its init, so this pair is set here.
+	pcall(function()
+		PhysicsService:CollisionGroupSetCollidable(ObstacleHop.BLOCKER_GROUP, "FetchBall", false)
+	end)
 	task.spawn(function()
 		while true do
 			task.wait(0.5)

@@ -26,6 +26,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Debris = game:GetService("Debris")
 
 local FetchMath = require(script.Parent.Parent.Logic.FetchMath)
+local ObstacleHop = require(ReplicatedStorage.Shared.ObstacleHop)
 local Places = require(ReplicatedStorage.Shared.Places)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
@@ -155,10 +156,12 @@ end
 local function groundBelow(p: Vector3, ball: BasePart?): number?
 	local params = RaycastParams.new()
 	params.FilterType = Enum.RaycastFilterType.Exclude
+	params.RespectCanCollide = true -- not trigger volumes or decorations
 	local ignore: { Instance } = { workspace:FindFirstChild("Pets") :: Instance }
 	if ball then
 		table.insert(ignore, ball)
 	end
+	ObstacleHop.groundIgnore(ignore) -- the ground under a hurdle, not its bar
 	params.FilterDescendantsInstances = ignore
 	local hit = workspace:Raycast(p + Vector3.new(0, 1, 0), Vector3.new(0, -60, 0), params)
 	return hit and hit.Position.Y or nil

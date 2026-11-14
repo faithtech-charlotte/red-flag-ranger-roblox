@@ -20,6 +20,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
+local ObstacleHop = require(ReplicatedStorage.Shared.ObstacleHop)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local State = require(script.Parent.State)
 local Sounds = require(script.Parent.Parent.UI.Sounds)
@@ -96,7 +97,8 @@ local function aimPoint(): Vector3?
 		if player.Character then
 			table.insert(ignore, player.Character)
 		end
-		params.FilterDescendantsInstances = ignore
+		-- Aim at the ground past a fence or hurdle, not at its invisible blocker.
+		params.FilterDescendantsInstances = ObstacleHop.groundIgnore(ignore)
 		local hit = workspace:Raycast(ray.Origin, ray.Direction * 400, params)
 		if hit then
 			return hit.Position
