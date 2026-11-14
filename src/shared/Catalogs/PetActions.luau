@@ -37,6 +37,9 @@ PetActions.Actions = {
 	stay = { id = "stay", label = "Stay", icon = "✋", touch = false, cooldown = 0.5, unlock = { kind = "command", id = "stay" }, order = 6 },
 	come = { id = "come", label = "Come", icon = "📣", touch = false, cooldown = 0.5, order = 7 },
 	tricks = { id = "tricks", label = "Tricks", icon = "⭐", touch = true, cooldown = 0, submenu = "tricks", order = 8 },
+	-- Always on screen (WhistleController): H / gamepad D-pad Up / touch button.
+	-- Works from anywhere; the dog drops whatever it's doing and runs back.
+	whistle = { id = "whistle", label = "Whistle", icon = "📣", touch = false, cooldown = 1, order = 9 },
 }
 
 PetActions.Tricks = {

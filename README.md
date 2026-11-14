@@ -50,6 +50,7 @@ A yellow beam points to the next Ranger Journal objective.
 
 ## Playing with your dog (feel overhaul)
 
+- **Whistle:** always on screen once you have a dog. H / gamepad D-pad Up / the 📣 button (above the jump button on touch screens) calls your dog back from anywhere: a chirp, a "!" over the dog, and it drops whatever it was doing and runs to you.
 - **Action bar** (bottom-left) slides in when you stand still near your dog and hides while you play. Q / gamepad Y open it from anywhere; on touch, use the 🐶 button.
 - **Petting:** ✋ Pet eases the camera into a close side shot. Stroke your dog with the mouse or your finger, or hold Space / gamepad A. The dog leans into your hand, squints, wags faster the more you pet, and thumps a back leg when you rub its side. Hearts come off your hand. A few seconds of real petting earns Bond XP (server-checked).
 - **Fetch:** 🎾 Ball equips a real ball tool. Hold to wind up (a dotted arc and landing ring show the throw; your dog crouches, ready), release to throw. The ball is real physics and bounces. Your dog waits a beat, sprints, grabs it (air catches get a banner), trots back proudly, drops it at your feet and sits for praise. The ball pops back into your hand. Roofs and out-of-bounds throws "poof" and you get a new ball.

@@ -73,7 +73,7 @@ local petting = { active = false, intensity = 0, side = 0, scratch = 0 }
 
 local MOOD_SECONDS = 1.8
 local MOOD_ICON = { happy = "⭐", love = "❤️", sparkle = "✨", comfort = "💙", confused = "❓" }
-local WOOF = { excited = "Woof!", happy = "Arf!", love = "♥", confused = "...?" }
+local WOOF = { excited = "Woof!", happy = "Arf!", love = "♥", confused = "...?", alert = "!" }
 
 local IDLE_MOVES = {
 	{ name = "tilt", weight = 3, duration = 1.3 },
@@ -638,8 +638,10 @@ local function animate(rig: Rig, dt: number)
 		elseif mood == "love" then
 			wag = 26
 			squint = true
-		elseif mood == "excited" then
+		elseif mood == "excited" or mood == "alert" then
+			-- alert: heard the whistle, bounding back
 			lift = math.max(lift, math.abs(math.sin(t * 10)) * 0.6)
+			sitTarget, lieTarget = 0, 0
 			wag = 26
 		elseif mood == "comfort" then
 			wag = 5
