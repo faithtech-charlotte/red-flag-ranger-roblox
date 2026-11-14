@@ -254,6 +254,18 @@ handlers.sit = command("Sitting")
 handlers.stay = command("Staying")
 handlers.come = command("Following")
 
+-- The whistle always works: whatever the dog is doing (fetching, eating,
+-- staying across the park), it drops it and runs back to you.
+handlers.whistle = function(player)
+	S.Activity.interrupt(player, "command")
+	local ok, reason = S.Pet.setState(player, "Following", { force = true })
+	if not ok then
+		return false, reason
+	end
+	S.Pet.recall(player)
+	return true, nil
+end
+
 handlers.trick = function(player, payload)
 	local trick = PetActions.Tricks[payload.trick]
 	if not trick then
@@ -305,7 +317,9 @@ local function handle(player: Player, payload: any): (boolean, string?)
 	if ok and def and def.cooldown > 0 then
 		startCooldown(player, def.id, def.cooldown)
 	end
-	local quiet = { attend = true, dismiss = true, feed = true, petStart = true, petStroke = true }
+	-- whistle: no quest or XP hangs on it, so it needn't publish or push state.
+	-- (petEnd isn't a PetAction; it has its own PetEnd request kind.)
+	local quiet = { attend = true, dismiss = true, feed = true, petStart = true, petStroke = true, whistle = true }
 	if ok and not quiet[action] then -- feed and petting publish their own events
 		EventBus.publish("pet.interacted", player, { action = action, trick = payload.trick })
 		S.Data.pushState(player)

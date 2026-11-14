@@ -20,6 +20,9 @@ local BUILTIN = {
 	pat = { id = "rbxasset://sounds/volume_slider.ogg", speed = 1.0, volume = 0.25 },
 	bounce = { id = "rbxasset://sounds/action_jump_land.mp3", speed = 1.8, volume = 0.35 },
 	whoosh = { id = "rbxasset://sounds/action_jump.mp3", speed = 0.9, volume = 0.4 },
+	-- Placeholder: a high chirp, played twice by WhistleController. A real
+	-- whistle in CUSTOM.whistle is the upgrade.
+	whistle = { id = "rbxasset://sounds/volume_slider.ogg", speed = 3.2, volume = 0.8 },
 }
 
 -- Asset ids for custom sounds. Empty for now. Most wanted: bark, happy whine,

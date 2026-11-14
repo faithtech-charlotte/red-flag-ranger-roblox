@@ -40,6 +40,10 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local TELEPORT_DISTANCE = 45
 local STAY_RECALL_DISTANCE = 140
 local INTERACTION_LEASH = 26
+-- After a whistle the dog gets a few seconds to run back instead of being
+-- popped next to you, unless it's so far away that the run would drag on.
+local RECALL_SECONDS = 6
+local RECALL_TELEPORT_DISTANCE = 200
 
 type Active = {
 	model: Model,
@@ -51,6 +55,7 @@ type Active = {
 	state: string,
 	base: string,
 	token: number,
+	recallUntil: number?,
 }
 
 local Pet = {}
@@ -347,6 +352,16 @@ function Pet.react(player: Player, mood: string)
 	end
 end
 
+-- Whistled back: a "!" over the dog, and a few seconds to run home before
+-- the stuck-recovery check would teleport it.
+function Pet.recall(player: Player)
+	local a = active[player]
+	if a then
+		a.recallUntil = workspace:GetServerTimeNow() + RECALL_SECONDS
+		Pet.react(player, "alert")
+	end
+end
+
 -- Positive care from items/services: a reaction plus Bond XP.
 function Pet.applyCare(player: Player, effect: { xp: number?, mood: string? }, source: string?)
 	if effect.mood then
@@ -421,7 +436,9 @@ local function monitor()
 		end
 		local distance = (a.root.Position - hrp.Position).Magnitude
 		local mode = StateMachine.Movement[a.state]
-		if a.state == "Following" and distance > TELEPORT_DISTANCE then
+		local recalling = a.recallUntil ~= nil and workspace:GetServerTimeNow() < a.recallUntil
+		local leash = recalling and RECALL_TELEPORT_DISTANCE or TELEPORT_DISTANCE
+		if a.state == "Following" and distance > leash then
 			-- Stuck or left behind: pop back next to the owner.
 			a.model:PivotTo(a.follow.WorldCFrame)
 			a.root.AssemblyLinearVelocity = Vector3.zero
