@@ -1,60 +1,47 @@
-# Handoff: interaction expansion, 2026-11-14 (session 3)
+# Handoff: interaction expansion, 2026-11-14 (session 4)
 
-Read `CLAUDE.md`, then `docs/implementation-plan.md` (r3, Codex-approved; the source of truth for phases and decisions), then this.
+Read `CLAUDE.md`, then `docs/implementation-plan.md` (r3, Codex-approved; source of truth for phases and decisions), then this, then `docs/phase2-notes.md`.
 
 ## Rules from the owner
 
 - Additive changes unless a requirement needs a new abstraction.
 - Trail Walk and Wash & Groom are core, never cut. No deadline.
-- Codex gives an independent read before planning and reviews every phase diff; fold its findings, then send the folds back for confirmation until APPROVE.
-- "Question mode" = use the AskUserQuestion dialog for decisions.
-- The spec overrides the research Storyline doc on purpose. Don't reopen those choices.
-- Ask before stopping the owner's Studio Play session.
-- Codex MCP is down; use the `codex:codex-rescue` agent with a read-only prompt and absolute paths.
+- Codex reviews every phase diff; fold its findings and resend until APPROVE. Codex MCP is down: use the `codex:codex-rescue` agent with a READ-ONLY prompt and absolute paths.
+- "Question mode" = AskUserQuestion. The spec overrides the research Storyline doc on purpose.
+- Ask before stopping the owner's Studio Play session. Never push without the owner's word.
+- Worktree agents start from `main`: tell them to `git reset --hard` onto the integration branch first, and never let them use Studio (one shared Studio; the orchestrator serializes tests).
+- Another session ("Red Flag Rangers dog controls") is building the tap-the-dog ring and solid dog off `main` (PetService, PetController, ActionBarController). Ping it before touching those.
 
-## Branch state: `feat/interaction-expansion` (off `main` de6fa01; nothing pushed)
+## Branch state
 
-| Commit | What |
-|---|---|
-| e89edce | Plan r3 + `docs/research/` source docs |
-| 5322a81 | Phase 0: save-lock, feedback-choice and stale-close fixes; agility runs are activity sessions; fetch interrupt frees the dog |
-| b6f1ce0 | Phase 1: schema v3, `Data.checkpoint`/retried release, `InteractionState`, `PanelCoordinator` |
-| eb05424 | Dialogue lifecycle: exit kinds, node revisions (`rev`), presented facts |
-| 23257ee, 3d379b2 | `docs/campaign-script.md` (40 provisional scenes) + owner decisions on its notes |
-| de1fce1 | Pure `EncounterScheduler`, `LearningProgress`, `ScoreRules`, `ContentCheck` + tests |
-| 8148c6c | `ProgressionService`, campaign conditions, `Data.view` + privacy tests |
-| 7a5664c, 3128079 | Phase 1 Codex folds (scheduler `kind`, one exit per scene, gap from end/dismissal, checkpoint writer loop, forced close, real active time) |
+Work is on **`worktree-trackb-integrate`** (worktree `.claude/worktrees/trackb-integrate`), which is `feat/interaction-expansion` (90e7112) plus:
 
-Phase 0 and Phase 1: **Codex APPROVE**. 138 tests pass in Studio; clean boot. Story invitations are intentionally OFF (`ProgressionService.INVITATIONS_ENABLED = false`) until Phase 2.
+| Commit | What | Status |
+|---|---|---|
+| 8bf0081..3fddcd7 (already on feat/interaction-expansion) | Track B: Trail Walk, Wash & Groom gestures, ratings, whistle confirm, agility at adoption | 167 tests passed in Studio |
+| 59039f9 | Track B Codex folds: grooming pays at completion + token-guarded cleanup; queued squirrel moments; death/respawn interrupts any activity (`ActivityService`) | **Codex APPROVE**, not yet run |
+| 77303b7..434a1d6 (8 commits) | Phase 2 story slice (see `docs/phase2-notes.md`) | **Never run, not reviewed** |
 
-## Update: Track B is on the branch; Phase 2 built, not yet run
+`feat/interaction-expansion` has NOT been moved. Once tests pass, fast-forward it to `worktree-trackb-integrate`. Nothing is pushed.
 
-- Track B (Trail Walk, Wash & Groom, whistle confirm) is committed (8bf0081..3fddcd7); 167 tests passed in Studio. The "Next step 1" section below is history.
-- Phase 2 (story vertical slice) was built by an agent on a worktree branch off 90e7112 and has **not been synced or run** yet. It adds `Content/Campaign/*`, `Logic/LeeTell`, `Logic/StoryRules`, `Services/StoryService`, `Client/Controllers/StoryDog`, campaign support in `EncounterService`, and turns invitations on. New specs: `LeeTell`, `StoryRules`, `StoryFlow`, `Campaign` (plus additions to ContentCheck, EncounterEngine, EncounterScheduler, ProgressionRules, Privacy). Next: sync, run the tests, Codex review of the diff, then the plan's Phase 2 "Verify in Studio" list.
+## Next, in order
 
-## Next step 1: integrate Track B (minigames), NOT yet on the branch
-
-Built by an agent in worktree branch `worktree-agent-a196ee3313227a43a` (based on 5322a81), **never run**. Commits, in order: `f973cfc` (Trail/Groom/Ratings rules + tests), `ca20139` (Trail Walk, hands-on Wash & Groom, activity ratings), `c1d3460` (whistle/command confirm, client-side), `820fcff` (agility unlocked at adoption), `1c31e34` (README/CLAUDE.md).
-
-- Cherry-pick them onto `feat/interaction-expansion`. Expected conflicts: `Remotes.luau` (PanelState vs TrailHold/TrailWalk kinds), `ProfileSchema.luau` (v3 types vs `bestRating`; keep v3, keep `bestRating: number?`), `client/init.client.luau`, `README.md`, `CLAUDE.md`.
-- Then sync and run the tests (expect ~167). The agent's full manual Studio checklist (keyboard/mouse, touch, gamepad, whistle confirm, cancel paths) is in its report; the essentials: trail markers in order, squirrel hold ≥1.8 s inside 6 s, walk never fails, stars on completion; spa gestures per step, shake, stars; first whistle press during any activity asks, second cancels.
-- Its own calls the owner may want to tune: shine base (2 stars if steps average ≤12 s), evenness ±1 star at ≥0.7/≤0.3, trail score 0.6 holds + 0.3 time vs par (60 s) + 0.1 sniffs. Not done: the "pick any activity" journal objective.
-- Then a Codex review of the Track B diff, then the owner's feel playtest (Phase 3 verify list).
-
-## Next step 2: Phase 2 (story vertical slice)
-
-Per plan section 5. Transcribe from `docs/campaign-script.md`: onboarding (Lee welcome + disclosure, Cara intro), Cara talk 1, `park_e1_hello`, `green_riley`, `park_e2_deal` (all branches), `lee_tell`, recovery, block → `rp_e2_deal` roleplay, invitation card (Talk / Later / Skip this story). Also: Sparkz per-player matching dog visual, Jordan arc unscheduled, NPC visibility rule, dialogue "Story character" label, `help_lee` "another app" + "Did this happen in a park story?" (owner decision), Lee can open the practice menu. Export `facts` (with `concerning`) and encounter `beat`/`roleplayFor` from `Content/init.luau`; turn invitations on.
-
-Owner decisions on the script (end of `docs/campaign-script.md`): Reach Out needs ≥1 fact picked; general Help asks if it was a park story; Cara stays blockable, Lee opens practice; Help mid-scene ends the scene.
+1. **Studio**: the MCP connection broke in session 4 and `/mcp` reconnect didn't restore the tools; a fresh session should. Sync (below), run tests (expect ~248). Fix failures (Phase 2 code was written without a Luau toolchain, so syntax/type errors are likely).
+2. Clean boot in Play; check console.
+3. Track B manual checklist: trail markers in order, squirrel hold ≥1.8 s inside 6 s, walk never fails, stars; spa gestures per step, shake, stars; first whistle press during an activity asks, second cancels; dying mid-activity ends it cleanly.
+4. Codex review of the Phase 2 diff (`git diff 59039f9 434a1d6`), fold until APPROVE.
+5. Phase 2 Studio checklist (`docs/phase2-notes.md`), then the owner's feel playtest (Track B) and Studio check (Phase 2).
+6. Then Phase 3 leftovers (journal objective "pick any activity") and Phase 4 per the plan.
 
 ## Studio notes
 
-- Sync: `cd tools/studio-sync && python3 build_manifest.py ../.. manifest.json`, serve with `python3 -m http.server 34999 --bind 127.0.0.1`, stop Play, run `sync.luau` via MCP `execute_luau` (Edit).
-- `execute_luau` in Server/Client runs in a separate require cache: you can't read live service state from it. Observe through remotes, pushes, attributes and console output.
-- To test agility without fetch before Track B lands, patch `Content.Activities` Source in Edit mode; the next sync restores it.
+- Sync: `cd tools/studio-sync && python3 build_manifest.py ../.. manifest.json`, serve with `python3 -m http.server 34999 --bind 127.0.0.1` (from that folder in the worktree), stop Play, run the body of `sync.luau` via MCP `execute_luau` (Edit).
+- `execute_luau` in Server/Client runs in a separate require cache: observe through remotes, pushes, attributes and console output.
 - `DialogueChoose` is rate-limited to 0.15 s; space test requests ≥0.4 s apart.
+- Starting Play via MCP `start_stop_play` hung the MCP connection in session 4. If it happens again, ask the owner to start Play by hand.
 
 ## Open (not blocking)
 
 - Who reviews the dialogue, and when: undecided.
 - Solo vs shared servers: build shared-safe; decide at publish.
+- Owner may want to tune Track B scoring: shine base (2 stars if steps average ≤12 s), evenness ±1 star at ≥0.7/≤0.3, trail score 0.6 holds + 0.3 time vs par (60 s) + 0.1 sniffs.
