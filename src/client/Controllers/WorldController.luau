@@ -26,6 +26,8 @@ local player = Players.LocalPlayer
 local WorldController = {}
 local hud
 local dialogue
+local activities
+local petting
 
 ----------------------------------------------------------------------------
 -- Waypoint
@@ -144,20 +146,16 @@ end
 ----------------------------------------------------------------------------
 
 local fetchButton: TextButton
-local fetchCount = 0
-local fetchGoal = 3
 local agilityLabel: TextLabel
 local agilityRun: { started: number, ring: number, total: number }? = nil
 
+local fetchAim
 local function throw()
-	local ok, err = State.request(Remotes.RequestKinds.ThrowBall)
-	if not ok and err and err ~= "slow down" then
-		hud.toast(err)
-	end
+	fetchAim.equip()
 end
 
 local function buildActivityUI(gui: ScreenGui)
-	fetchButton = Theme.button("🎾 Throw!", C.green, throw, {
+	fetchButton = Theme.button("🎾 Play fetch", C.green, throw, {
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, -24),
 		Size = UDim2.fromOffset(220, 64),
@@ -180,7 +178,7 @@ local function buildActivityUI(gui: ScreenGui)
 	Theme.corner(14).Parent = agilityLabel
 
 	UserInputService.InputBegan:Connect(function(input, processed)
-		if not processed and fetchButton.Visible and (input.KeyCode == Enum.KeyCode.F or input.KeyCode == Enum.KeyCode.ButtonX) then
+		if not processed and fetchButton.Visible and input.KeyCode == Enum.KeyCode.F then
 			throw()
 		end
 	end)
@@ -191,10 +189,11 @@ local function updateActivityUI()
 	local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
 	local inPark = hrp ~= nil and Places.isInside("dog_park", hrp.Position)
 	local hasPet = State.data ~= nil and State.data.pet ~= nil
-	fetchButton.Visible = inPark and hasPet and not dialogue.isOpen()
+	-- The ball lives in the hotbar now; this is only a nudge for new players.
+	fetchButton.Visible = inPark and hasPet and not dialogue.isOpen() and not fetchAim.isEquipped() and not activities.isBusy() and not petting.isActive() and not (State.data.quests and State.data.quests.first_fetch)
 	if fetchButton.Visible then
 		local keyHint = UserInputService.KeyboardEnabled and " [F]" or ""
-		fetchButton.Text = `🎾 Throw!  {fetchCount}/{fetchGoal}{keyHint}`
+		fetchButton.Text = `🎾 Play fetch{keyHint}`
 	end
 	if agilityRun then
 		local t = os.clock() - agilityRun.started
@@ -209,6 +208,9 @@ end
 function WorldController.start(gui: ScreenGui, controllers)
 	hud = controllers.HUD
 	dialogue = controllers.Dialogue
+	fetchAim = controllers.Ball
+	petting = controllers.Petting
+	activities = controllers.Activity
 	buildWaypoint()
 	buildActivityUI(gui)
 
@@ -221,14 +223,6 @@ function WorldController.start(gui: ScreenGui, controllers)
 	State.push:Connect(function(kind, payload)
 		if kind == Remotes.PushKinds.Waypoint then
 			override = { placeId = payload.placeId, untilTime = os.clock() + 90 }
-		elseif kind == Remotes.PushKinds.Fetch then
-			fetchCount = payload.count
-			fetchGoal = payload.goal
-			if payload.done then
-				task.delay(1.5, function()
-					fetchCount = 0
-				end)
-			end
 		elseif kind == Remotes.PushKinds.Agility then
 			if payload.state == "running" then
 				if payload.ring == 0 or not agilityRun then

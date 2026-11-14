@@ -17,14 +17,30 @@ local services = {
 	Economy = require(Services.EconomyService),
 	Inventory = require(Services.InventoryService),
 	Appearance = require(Services.PetAppearanceService),
+	Bond = require(Services.PetBondService),
 	Pet = require(Services.PetService),
+	Interaction = require(Services.PetInteractionService),
 	Activity = require(Services.ActivityService),
 	Quest = require(Services.QuestService),
 	NPC = require(Services.NPCService),
 	Encounter = require(Services.EncounterService),
 }
 
-local order = { "Net", "World", "Data", "Economy", "Inventory", "Appearance", "Pet", "Activity", "Quest", "NPC", "Encounter" }
+local order = {
+	"Net",
+	"World",
+	"Data",
+	"Economy",
+	"Inventory",
+	"Appearance",
+	"Bond",
+	"Pet",
+	"Interaction",
+	"Activity",
+	"Quest",
+	"NPC",
+	"Encounter",
+}
 
 for _, name in order do
 	services[name].init(services)

@@ -1,299 +1,193 @@
 --[[
-	ActivityService: fetch and the agility course. All timing, counting, and
-	rewards happen here; the client only asks to throw and shows progress.
+	ActivityService: the shared activity framework.
 
-	Anti-farming:
-	  * One fetch at a time; each throw needs the dog to actually return.
-	  * Agility rings must be passed in order and the run must take a
-	    plausible minimum time.
-	  * First-completion bonuses are claimed once (profile.claims).
+	  * Definitions (rewards, rules) come from Content/Activities.
+	  * Mechanics (Server/Activities/*) do the playing: Fetch, Agility,
+	    Grooming, TrickTraining, and world Props that start them.
+	  * One session per player at a time. Starting a new one interrupts the
+	    old one, which cleans up after itself through its onInterrupt.
+	  * complete() is the only place rewards are paid: coins (with a
+	    first-time bonus and a cooldown against loops), medal bonuses, Bond
+	    XP, and the "activity.completed" event that quests and Jordan's story
+	    listen to.
+
+	Mechanics are decoupled from world objects: e.g. Fetch.throw() is the same
+	whether it starts from the pet menu, the park's ball bucket, or a quest.
 ]]
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local TweenService = game:GetService("TweenService")
-local Debris = game:GetService("Debris")
 
 local ActionService = require(script.Parent.Parent.Core.ActionService)
 local EventBus = require(script.Parent.Parent.Core.EventBus)
+local Conditions = require(script.Parent.Parent.Logic.Conditions)
+local Definitions = require(script.Parent.Parent.Content.Activities)
 local Places = require(ReplicatedStorage.Shared.Places)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
-local Activities = {
-	fetch = { name = "Fetch", reward = 8, firstBonus = 17, goal = 3 },
-	agility = { name = "Agility Course", reward = 12, firstBonus = 18, minSeconds = 6 },
-}
+local MechanicsFolder = script.Parent.Parent.Activities
+local MECHANICS = { "Fetch", "Agility", "Grooming", "TrickTraining", "Props" }
 
-local THROW_DISTANCE = 24
-local FETCH_TIMEOUT = 8
+export type Session = {
+	id: string,
+	startedAt: number,
+	data: { [string]: any },
+	onInterrupt: ((reason: string) -> ())?,
+}
 
 local Activity = {}
 local S
-local fetchState: { [Player]: { count: number, busy: boolean } } = {}
-local runs: { [Player]: { started: number, nextRing: number } } = {}
-local hintAt: { [Player]: number } = {}
+local sessions: { [Player]: Session } = {}
+local lastPaid: { [Player]: { [string]: number } } = {}
+local mechanics = {}
 
-local function hrpOf(player: Player): BasePart?
+Activity.Definitions = Definitions
+
+function Activity.def(id: string)
+	return Definitions[id]
+end
+
+function Activity.hrp(player: Player): BasePart?
 	local c = player.Character
 	return c and c:FindFirstChild("HumanoidRootPart") :: BasePart?
 end
 
-local function hint(player: Player, text: string)
-	local now = os.clock()
-	if hintAt[player] and now - hintAt[player] < 3 then
-		return
-	end
-	hintAt[player] = now
-	S.Net.toast(player, text, "info")
+function Activity.isAt(player: Player, placeId: string, margin: number?): boolean
+	local hrp = Activity.hrp(player)
+	return hrp ~= nil and Places.isInside(placeId, hrp.Position, margin)
 end
 
-function Activity.complete(player: Player, activityId: string, data: { [string]: any }?)
-	local def = Activities[activityId]
+-- Eligibility for a defined activity. Returns (ok, reason?).
+function Activity.canStart(player: Player, id: string): (boolean, string?)
+	local def = Definitions[id]
+	local profile = S.Data.get(player)
+	if not def or not profile then
+		return false, "Not available."
+	end
+	if not Conditions.evaluate(def.requires, { profile = profile }) then
+		if not profile.activePetId then
+			return false, "Adopt a dog first!"
+		end
+		return false, "Not unlocked yet."
+	end
+	return true, nil
+end
+
+function Activity.current(player: Player): Session?
+	return sessions[player]
+end
+
+-- Starts a session, interrupting any other one first.
+function Activity.begin(player: Player, id: string, onInterrupt: ((string) -> ())?): Session
+	Activity.interrupt(player, "replaced")
+	local session = { id = id, startedAt = os.clock(), data = {}, onInterrupt = onInterrupt }
+	sessions[player] = session
+	return session
+end
+
+-- Ends a session normally (no interrupt callback).
+function Activity.finish(player: Player, session: Session?)
+	if session == nil or sessions[player] == session then
+		sessions[player] = nil
+	end
+end
+
+function Activity.interrupt(player: Player, reason: string)
+	local session = sessions[player]
+	if not session then
+		return
+	end
+	sessions[player] = nil
+	if session.onInterrupt then
+		local ok, err = pcall(session.onInterrupt, reason)
+		if not ok then
+			warn(`[Activity] interrupt of {session.id} failed: {err}`)
+		end
+	end
+end
+
+-- Pays rewards for a completed activity. Only server mechanics call this.
+function Activity.complete(player: Player, id: string, data: { [string]: any }?)
+	local def = Definitions[id]
 	local profile = S.Data.get(player)
 	if not def or not profile then
 		return
 	end
-	local record = profile.activities[activityId] or { count = 0 }
+	local record = profile.activities[id] or { count = 0 }
 	record.count += 1
-	if data and data.timeSeconds and (record.best == nil or data.timeSeconds < record.best) then
-		record.best = data.timeSeconds
+	local seconds = data and data.timeSeconds
+	if seconds and (record.best == nil or seconds < record.best) then
+		record.best = seconds
 	end
-	profile.activities[activityId] = record
+	profile.activities[id] = record
 
-	local reward = def.reward
-	local claim = "first:" .. activityId
-	if not profile.claims[claim] then
-		profile.claims[claim] = true
-		reward += def.firstBonus
+	local coins = 0
+	local now = os.clock()
+	lastPaid[player] = lastPaid[player] or {}
+	local paidAt = lastPaid[player][id]
+	if paidAt == nil or now - paidAt >= (def.rewardCooldown or 0) then
+		lastPaid[player][id] = now
+		coins += def.rewards.coins or 0
 	end
-	S.Economy.grant(player, reward, activityId)
+	local firstClaim = "first:" .. id
+	if not profile.claims[firstClaim] then
+		profile.claims[firstClaim] = true
+		coins += def.rewards.firstBonus or 0
+	end
+	local medal = nil
+	if seconds and def.medals then
+		for _, m in def.medals do
+			if seconds < m.under then
+				medal = m
+				local claim = `medal:{id}:{m.id}`
+				if not profile.claims[claim] then
+					profile.claims[claim] = true
+					coins += m.bonus
+				end
+				break
+			end
+		end
+	end
+
+	if coins > 0 then
+		S.Economy.grant(player, coins, id)
+	end
+	if def.rewards.bond then
+		S.Bond.addXp(player, def.rewards.bond)
+	end
 	S.Pet.react(player, "happy")
 	S.Net.push(player, Remotes.PushKinds.Celebrate, {
 		title = `{def.name} complete!`,
-		coins = reward,
+		subtitle = medal and `{medal.label} time!` or nil,
+		coins = coins > 0 and coins or nil,
 	})
 	EventBus.publish("activity.completed", player, {
-		activityId = activityId,
+		activityId = id,
 		count = record.count,
-		timeSeconds = data and data.timeSeconds,
+		timeSeconds = seconds,
+		medal = medal and medal.id or nil,
 	})
 	S.Data.pushState(player)
 end
 
-----------------------------------------------------------------------------
--- Fetch
-----------------------------------------------------------------------------
-
-local function waitUntil(predicate: () -> boolean, timeout: number): boolean
-	local t = 0
-	while t < timeout do
-		if predicate() then
-			return true
-		end
-		t += task.wait(0.1)
-	end
-	return false
-end
-
-local function throwBall(player: Player): (boolean, string?)
-	local profile = S.Data.get(player)
-	local hrp = hrpOf(player)
-	local pet = S.Pet.getActive(player)
-	if not profile or not profile.activePetId or not pet then
-		return false, "Adopt a dog first!"
-	end
-	if not hrp or not Places.isInside("dog_park", hrp.Position) then
-		return false, "Fetch works at Sunny Dog Park."
-	end
-	local state = fetchState[player] or { count = 0, busy = false }
-	fetchState[player] = state
-	if state.busy then
-		return false, "Wait for your dog to bring the ball back!"
-	end
-	state.busy = true
-
-	task.spawn(function()
-		local park = Places.get("dog_park") :: Places.Place
-		local flat = Vector3.new(hrp.CFrame.LookVector.X, 0, hrp.CFrame.LookVector.Z)
-		if flat.Magnitude < 0.1 then
-			flat = Vector3.new(0, 0, -1)
-		end
-		local target = hrp.Position + flat.Unit * THROW_DISTANCE
-		local half = park.size / 2 - Vector3.new(5, 0, 5)
-		target = Vector3.new(
-			math.clamp(target.X, park.center.X - half.X, park.center.X + half.X),
-			0.6,
-			math.clamp(target.Z, park.center.Z - half.Z, park.center.Z + half.Z)
-		)
-
-		local ball = Instance.new("Part")
-		ball.Name = "FetchBall"
-		ball.Shape = Enum.PartType.Ball
-		ball.Size = Vector3.new(1.2, 1.2, 1.2)
-		ball.Color = Color3.fromRGB(200, 255, 60)
-		ball.Material = Enum.Material.SmoothPlastic
-		ball.Anchored = true
-		ball.CanCollide = false
-		ball.CanQuery = false
-		ball.CanTouch = false
-		ball.Position = hrp.Position + Vector3.new(0, 1.5, 0) + flat.Unit * 2
-		local hold = Instance.new("Attachment")
-		hold.Name = "BallTarget"
-		hold.Position = Vector3.new(0, 0.9, 0.9)
-		hold.Parent = ball
-		ball.Parent = workspace
-		Debris:AddItem(ball, 30)
-
-		local mid = (ball.Position + target) / 2 + Vector3.new(0, 9, 0)
-		local up = TweenService:Create(ball, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), { Position = mid })
-		up:Play()
-		up.Completed:Wait()
-		local down = TweenService:Create(ball, TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.In), { Position = target })
-		down:Play()
-		down.Completed:Wait()
-
-		local active = S.Pet.getActive(player)
-		if not active then
-			state.busy = false
-			ball:Destroy()
-			return
-		end
-		S.Pet.setTarget(player, hold)
-		waitUntil(function()
-			return (active.root.Position - ball.Position).Magnitude < 3.5
-		end, FETCH_TIMEOUT)
-
-		-- Ball in mouth, run back.
-		local mouth = active.model:FindFirstChild("MouthAttachment", true) :: Attachment?
-		if mouth and ball.Parent then
-			ball.Size = Vector3.new(0.8, 0.8, 0.8)
-			ball.Anchored = false
-			ball.Massless = true
-			ball.CFrame = mouth.WorldCFrame
-			local w = Instance.new("WeldConstraint")
-			w.Part0 = mouth.Parent :: BasePart
-			w.Part1 = ball
-			w.Parent = ball
-			ball.Parent = active.model
-		end
-		S.Pet.setTarget(player, nil)
-		local back = waitUntil(function()
-			local h = hrpOf(player)
-			return h ~= nil and (active.root.Position - h.Position).Magnitude < 8
-		end, FETCH_TIMEOUT)
-		ball:Destroy()
-		state.busy = false
-		if not back or not player.Parent then
-			S.Net.push(player, Remotes.PushKinds.Fetch, { count = state.count, goal = Activities.fetch.goal })
-			return
-		end
-		state.count += 1
-		S.Pet.react(player, "happy")
-		if state.count >= Activities.fetch.goal then
-			state.count = 0
-			S.Net.push(player, Remotes.PushKinds.Fetch, { count = Activities.fetch.goal, goal = Activities.fetch.goal, done = true })
-			Activity.complete(player, "fetch")
-		else
-			S.Net.push(player, Remotes.PushKinds.Fetch, { count = state.count, goal = Activities.fetch.goal })
-		end
-	end)
-	return true, nil
-end
-
-----------------------------------------------------------------------------
--- Agility
-----------------------------------------------------------------------------
-
-local function playerFromHit(hit: BasePart): Player?
-	local model = hit:FindFirstAncestorOfClass("Model")
-	return model and Players:GetPlayerFromCharacter(model)
-end
-
-local function ringCount(course: Instance): number
-	local n = 0
-	for _, d in course:GetDescendants() do
-		if d:GetAttribute("RingIndex") then
-			n += 1
-		end
-	end
-	return n
-end
-
-local function hookAgility(course: Instance)
-	local total = ringCount(course)
-	local start = course:FindFirstChild("AgilityStart", true) :: BasePart?
-	local finish = course:FindFirstChild("AgilityFinish", true) :: BasePart?
-	if not start or not finish or total == 0 then
-		warn("[Activity] agility course parts missing")
-		return
-	end
-
-	start.Touched:Connect(function(hit)
-		local player = playerFromHit(hit)
-		if not player then
-			return
-		end
-		local profile = S.Data.get(player)
-		if not profile then
-			return
-		end
-		if not profile.unlocks.agility then
-			hint(player, "Play fetch at Sunny Dog Park first to unlock the course!")
-			return
-		end
-		local run = runs[player]
-		if run and run.nextRing > 1 and os.clock() - run.started < 60 then
-			return -- mid-run; ignore stepping back on start
-		end
-		runs[player] = { started = os.clock(), nextRing = 1 }
-		S.Net.push(player, Remotes.PushKinds.Agility, { state = "running", ring = 0, total = total })
-	end)
-
-	for _, d in course:GetDescendants() do
-		local index = d:GetAttribute("RingIndex")
-		if index and d:IsA("BasePart") then
-			d.Touched:Connect(function(hit)
-				local player = playerFromHit(hit)
-				local run = player and runs[player]
-				if run and run.nextRing == index then
-					run.nextRing += 1
-					S.Net.push(player :: Player, Remotes.PushKinds.Agility, { state = "running", ring = index, total = total })
-				end
-			end)
-		end
-	end
-
-	finish.Touched:Connect(function(hit)
-		local player = playerFromHit(hit)
-		local run = player and runs[player]
-		if not player or not run then
-			return
-		end
-		if run.nextRing <= total then
-			hint(player, `Go through every ring first! ({run.nextRing - 1}/{total})`)
-			return
-		end
-		local elapsed = os.clock() - run.started
-		runs[player] = nil
-		if elapsed < Activities.agility.minSeconds then
-			return
-		end
-		local seconds = math.floor(elapsed * 10) / 10
-		S.Net.push(player, Remotes.PushKinds.Agility, { state = "finished", time = seconds, total = total })
-		Activity.complete(player, "agility", { timeSeconds = seconds })
-	end)
-end
-
 function Activity.init(services)
 	S = services
+	for _, name in MECHANICS do
+		local module = require(MechanicsFolder:FindFirstChild(name) :: ModuleScript)
+		mechanics[name] = module
+		module.init(services, Activity)
+	end
+	Activity.Fetch = mechanics.Fetch
+
 	ActionService.register("unlock_activity", function(player, spec)
 		local profile = S.Data.get(player)
-		if not profile or not Activities[spec.activityId] then
+		local def = Definitions[spec.activityId]
+		if not profile or not def then
 			return false, "unknown activity"
 		end
 		if not profile.unlocks[spec.activityId] then
 			profile.unlocks[spec.activityId] = true
-			S.Net.toast(player, `New activity unlocked: {Activities[spec.activityId].name}!`, "success")
+			S.Net.toast(player, `New activity unlocked: {def.name}!`, "success")
 			S.Data.pushState(player)
 		end
 		return true
@@ -301,17 +195,16 @@ function Activity.init(services)
 end
 
 function Activity.start()
-	S.Net.on(Remotes.RequestKinds.ThrowBall, throwBall, 0.5)
-	task.spawn(function()
-		local course = S.World.getAgilityCourse()
-		if course then
-			hookAgility(course)
-		end
-	end)
+	for _, name in MECHANICS do
+		mechanics[name].start()
+	end
+	S.Net.on(Remotes.RequestKinds.ActivityCancel, function(player)
+		Activity.interrupt(player, "cancelled")
+		return true
+	end, 0.3)
 	Players.PlayerRemoving:Connect(function(player)
-		fetchState[player] = nil
-		runs[player] = nil
-		hintAt[player] = nil
+		Activity.interrupt(player, "left")
+		lastPaid[player] = nil
 	end)
 end
 

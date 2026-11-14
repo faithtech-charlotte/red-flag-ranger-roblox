@@ -120,15 +120,10 @@ function Inventory.start()
 		if not item or item.kind ~= "consumable" then
 			return false, "You can't use that."
 		end
-		local profile = S.Data.get(player)
-		if not profile or not profile.activePetId then
+		if not S.Pet.getActive(player) then
 			return false, "Adopt a dog first!"
 		end
-		if not Inventory.consume(player, item.id) then
-			return false, "You don't have any left."
-		end
-		S.Pet.applyCare(player, item.effect or {})
-		return true, nil
+		return S.Interaction.feed(player, item.id)
 	end, 1)
 end
 
