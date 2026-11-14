@@ -82,7 +82,7 @@ local function cooldownLeft(key: string): number
 end
 
 local function busyOutside(): boolean
-	return ctl.Dialogue.isOpen() or ctl.Petting.isActive() or ctl.Ball.isEquipped() or ctl.Activity.isBusy()
+	return ctl.Dialogue.isOpen() or ctl.Petting.isActive() or ctl.Ball.isEquipped() or ctl.Frisbee.isEquipped() or ctl.Activity.isBusy()
 end
 
 local function send(payload)

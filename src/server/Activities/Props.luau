@@ -3,6 +3,7 @@
 	builders can place more of them anywhere.
 
 	  FetchStation  "Grab a ball": starts the shared fetch aiming mode
+	  FrisbeeStation "Grab a frisbee": starts the Frisbee Field catch game
 	  PetToy        "Squeaky toy": the dog pounces and plays (Bond XP)
 	  MissionBoard  "Missions": opens the Ranger Journal
 ]]
@@ -31,6 +32,16 @@ local HANDLERS = {
 				return
 			end
 			S.Net.push(player, Remotes.PushKinds.FetchAim)
+		end,
+	},
+	FrisbeeStation = {
+		action = "Grab a frisbee",
+		object = "Frisbees",
+		run = function(player: Player)
+			local ok, reason = Activity.Frisbee.startGame(player)
+			if not ok and reason then
+				S.Net.toast(player, reason, "info")
+			end
 		end,
 	},
 	PetToy = {

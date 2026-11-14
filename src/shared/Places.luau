@@ -64,6 +64,15 @@ local Places: { [string]: Place } = {
 		color = Color3.fromRGB(80, 160, 255),
 		entrance = Vector3.new(0, 0, -92),
 	},
+	frisbee_field = {
+		id = "frisbee_field",
+		displayName = "Frisbee Field",
+		-- East of the Training Grounds; throw from the west end toward +X.
+		center = Vector3.new(104, 0, -120),
+		size = Vector3.new(88, 40, 64),
+		color = Color3.fromRGB(255, 90, 140),
+		entrance = Vector3.new(66, 0, -120),
+	},
 }
 
 local M = {}

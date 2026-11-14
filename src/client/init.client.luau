@@ -27,6 +27,7 @@ local controllers = {
 	ActionBar = require(Controllers.ActionBarController),
 	Petting = require(Controllers.PettingController),
 	Ball = require(Controllers.BallController),
+	Frisbee = require(Controllers.FrisbeeController),
 	Activity = require(Controllers.ActivityController),
 	Missions = require(Controllers.MissionsController),
 	World = require(Controllers.WorldController),
@@ -41,6 +42,7 @@ controllers.Pet.start()
 controllers.ActionBar.start(gui, controllers)
 controllers.Petting.start(gui, controllers)
 controllers.Ball.start(gui, controllers)
+controllers.Frisbee.start(gui, controllers)
 controllers.Activity.start(gui, controllers)
 controllers.Missions.start(gui, controllers)
 controllers.World.start(gui, controllers)
