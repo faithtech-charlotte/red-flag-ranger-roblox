@@ -286,8 +286,16 @@ Encounters.coach_intro = {
 	nodes = {
 		hi = {
 			speaker = "npc",
-			text = "Step on the green START pad, jump the hurdles, go through every ring, and finish on the checkered pad. Your dog will run with you!",
-			choices = { { id = "go", text = "Let's go!", actions = { { action = "pet_react", mood = "happy" } } } },
+			text = "Welcome to the Training Grounds! Run the course: START pad, every ring, then the checkered FINISH. Or practice tricks with {petName} on the training mat. The better you two get, the harder I'll make it!",
+			choices = {
+				{ id = "go", text = "Let's run the course!", actions = { { action = "pet_react", mood = "happy" } } },
+				{ id = "tricks", text = "How do tricks work?", next = "tricks" },
+			},
+		},
+		tricks = {
+			speaker = "npc",
+			text = "Spend time with {petName}: pet, feed, play, groom. Your Bond Level goes up and new tricks unlock. Spin comes first, at Bond Level 3!",
+			choices = { { id = "ok", text = "Got it!" } },
 		},
 	},
 }

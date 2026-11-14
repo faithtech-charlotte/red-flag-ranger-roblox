@@ -7,6 +7,9 @@
 	  service    - applied immediately on purchase, never stored (bubble bath)
 	  bundle     - grants several items at once
 
+	shop: which store sells it ("salon" or "treat_shop", a Places id). Items
+	with unlockOnly = true can't be bought; they come from Bond Levels.
+
 	`visual` is read only by Shared.Accessories / PetAppearanceService. Nothing
 	in purchasing looks at it.
 ]]
@@ -23,8 +26,10 @@ export type Item = {
 	slot: string?,
 	visual: { [string]: any }?,
 	contents: { string }?,
-	effect: { bond: number?, mood: string? }?,
-	tab: "dog" | "me" | "care",
+	effect: { xp: number?, mood: string? }?,
+	tab: "dog" | "me" | "care" | "treats",
+	shop: string?,
+	unlockOnly: boolean?,
 	sortOrder: number,
 }
 
@@ -101,22 +106,47 @@ local Items: { [string]: Item } = {
 		contents = { "hat_sun_player", "hat_sun_pet" },
 	},
 
-	-- Care
-	treat_biscuit = {
-		id = "treat_biscuit", name = "Bone Biscuit", description = "A crunchy treat. Your dog will love it.",
-		kind = "consumable", price = 5, target = "pet", tab = "care", sortOrder = 70,
-		effect = { bond = 1, mood = "happy" },
+	-- Bond Level reward (not for sale)
+	collar_best_friend = {
+		id = "collar_best_friend", name = "Best Friend Collar", description = "Earned at Bond Level 10. You two are inseparable!",
+		kind = "cosmetic", price = 0, target = "pet", slot = "collar", tab = "dog", sortOrder = 13, unlockOnly = true,
+		visual = { kind = "collar", color = rgb(255, 209, 102), tag = rgb(239, 71, 111), neon = true },
 	},
+
+	-- Salon care
 	groom_bubble_bath = {
 		id = "groom_bubble_bath", name = "Bubble Bath", description = "Squeaky clean and extra fluffy.",
 		kind = "service", price = 10, target = "pet", tab = "care", sortOrder = 71,
-		effect = { bond = 2, mood = "sparkle" },
+		effect = { mood = "sparkle" },
+	},
+
+	-- Treat Shop
+	treat_biscuit = {
+		id = "treat_biscuit", name = "Bone Biscuit", description = "A crunchy classic.",
+		kind = "consumable", price = 5, target = "pet", tab = "treats", shop = "treat_shop", sortOrder = 80,
+		effect = { xp = 10, mood = "happy" },
+	},
+	treat_carrot = {
+		id = "treat_carrot", name = "Carrot Crunch", description = "Healthy and crunchy.",
+		kind = "consumable", price = 4, target = "pet", tab = "treats", shop = "treat_shop", sortOrder = 81,
+		effect = { xp = 8, mood = "happy" },
+	},
+	treat_pupcake = {
+		id = "treat_pupcake", name = "Peanut Pupcake", description = "A special treat. Watch the tail go!",
+		kind = "consumable", price = 12, target = "pet", tab = "treats", shop = "treat_shop", sortOrder = 82,
+		effect = { xp = 18, mood = "love" },
 	},
 }
 
 local ItemCatalog = {}
 ItemCatalog.Items = Items
 ItemCatalog.MaxStack = 99
+ItemCatalog.DefaultShop = "salon"
+
+-- Which store (Places id) sells this item.
+function ItemCatalog.shopOf(item: Item): string
+	return item.shop or ItemCatalog.DefaultShop
+end
 
 function ItemCatalog.get(id: any): Item?
 	if typeof(id) ~= "string" then

@@ -9,6 +9,7 @@
 	  World.Agility.AgilityStart / AgilityFinish / parts with RingIndex 1..N
 ]]
 
+local CollectionService = game:GetService("CollectionService")
 local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -189,8 +190,8 @@ local function building(parent: Instance, name: string, center: Vector3, size: V
 		for lz = -1, 1, 2 do
 			local lamp = block(m, "CeilingLight", Vector3.new(3, 0.3, 3), center.X + lx * size.X / 3.2, h - 0.3, center.Z + lz * size.Z / 4.5, C.white, { Material = Enum.Material.Neon })
 			local light = Instance.new("PointLight")
-			light.Range = 26
-			light.Brightness = 1.6
+			light.Range = 18
+			light.Brightness = 0.5
 			light.Color = Color3.fromRGB(255, 244, 225)
 			light.Parent = lamp
 		end
@@ -255,17 +256,62 @@ local function buildPetStore(parent: Instance)
 	end
 end
 
-local function buildRangerStation(parent: Instance)
+local function buildRangerHQ(parent: Instance)
 	local p = Places.get("ranger_station") :: Places.Place
-	local m = folder("RangerStation", parent)
-	block(m, "Deck", Vector3.new(16, 0.6, 14), p.center.X + 2, 0, p.center.Z, C.wood, { Material = Enum.Material.WoodPlanks })
-	block(m, "BackWall", Vector3.new(1, 11, 14), p.center.X + 9.5, 0.6, p.center.Z, C.green)
-	block(m, "SideWall", Vector3.new(16, 11, 1), p.center.X + 2, 0.6, p.center.Z - 7, C.green)
-	block(m, "SideWall", Vector3.new(16, 11, 1), p.center.X + 2, 0.6, p.center.Z + 7, C.green)
-	block(m, "Roof", Vector3.new(19, 1, 17), p.center.X + 2, 11.6, p.center.Z, C.wood)
-	sign(m, "Ranger Station  ♥  Help is always here", CFrame.new(p.center.X - 6.2, 9, p.center.Z) * CFrame.Angles(0, math.rad(90), 0), Vector2.new(13, 2.2), C.green)
-	block(m, "FlagPole", Vector3.new(0.4, 16, 0.4), p.center.X - 5, 0, p.center.Z + 9, C.white)
-	block(m, "Flag", Vector3.new(0.2, 2.5, 4), p.center.X - 5, 13, p.center.Z + 11, C.yellow)
+	local m = folder("RangerHQ", parent)
+	local cx, cz = p.center.X, p.center.Z
+	block(m, "Deck", Vector3.new(18, 0.6, 18), cx + 2, 0, cz, C.wood, { Material = Enum.Material.WoodPlanks })
+	block(m, "BackWall", Vector3.new(1, 12, 18), cx + 10.5, 0.6, cz, C.green)
+	block(m, "SideWall", Vector3.new(18, 12, 1), cx + 2, 0.6, cz - 8.5, C.green)
+	block(m, "SideWall", Vector3.new(18, 12, 1), cx + 2, 0.6, cz + 8.5, C.green)
+	block(m, "Roof", Vector3.new(21, 1, 21), cx + 2, 12.6, cz, C.wood)
+	block(m, "RoofTrim", Vector3.new(21.4, 1.2, 0.5), cx + 2, 11.6, cz - 10.6, C.yellow)
+	block(m, "RoofTrim", Vector3.new(21.4, 1.2, 0.5), cx + 2, 11.6, cz + 10.6, C.yellow)
+	sign(m, "Ranger HQ  ♥  Help is always here", CFrame.new(cx - 7.2, 10, cz) * CFrame.Angles(0, math.rad(90), 0), Vector2.new(15, 2.4), C.green)
+	block(m, "FlagPole", Vector3.new(0.4, 18, 0.4), cx - 6, 0, cz + 11, C.white)
+	block(m, "Flag", Vector3.new(0.2, 2.5, 4), cx - 6, 15, cz + 13, C.yellow)
+
+	-- Mission board: friendly adventure hub, not a classroom.
+	local board = block(m, "MissionBoard", Vector3.new(0.6, 5, 7), cx + 9.6, 1.5, cz - 3, C.wood)
+	CollectionService:AddTag(board, "MissionBoard")
+	sign(m, "📜 MISSION BOARD", CFrame.new(cx + 9.2, 6, cz - 3) * CFrame.Angles(0, math.rad(90), 0), Vector2.new(6.6, 1.2), C.orange)
+	for i = 0, 2 do
+		block(m, "Note", Vector3.new(0.1, 1.2, 1.6), cx + 9.25, 2.4 + (i % 2) * 1.4, cz - 5.5 + i * 2.2, ({ C.yellow, C.pink, C.blue })[i + 1])
+	end
+	-- Campfire circle and logs (glowing "fire" is just a soft neon light).
+	local fire = block(m, "Campfire", Vector3.new(1.6, 1, 1.6), cx - 2, 0.6, cz + 14, Color3.fromRGB(255, 140, 50), { Material = Enum.Material.Neon, Shape = Enum.PartType.Ball })
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(255, 170, 90)
+	light.Range = 14
+	light.Parent = fire
+	for i = 0, 2 do
+		local a = math.rad(i * 120)
+		part(m, {
+			Name = "Log",
+			Shape = Enum.PartType.Cylinder,
+			Size = Vector3.new(3.4, 1, 1),
+			CFrame = CFrame.new(cx - 2 + math.cos(a) * 3, 0.5, cz + 14 + math.sin(a) * 3) * CFrame.Angles(0, -a + math.rad(90), 0),
+			Color = C.trunk,
+		})
+	end
+end
+
+local function buildTreatShop(parent: Instance)
+	local p = Places.get("treat_shop") :: Places.Place
+	local m = building(parent, "TreatShop", p.center, Vector3.new(24, 12, 22), Color3.fromRGB(255, 236, 200), Color3.fromRGB(255, 159, 67), "east", 10)
+	sign(m, "Bo's Treat Shop", CFrame.new(p.center.X + 12.8, 9.6, p.center.Z) * CFrame.Angles(0, math.rad(-90), 0), Vector2.new(13, 2.2), C.orange)
+	block(m, "Counter", Vector3.new(2, 3.2, 10), p.center.X - 3, 0, p.center.Z, C.pink)
+	block(m, "CounterTop", Vector3.new(2.4, 0.3, 10.4), p.center.X - 3, 3.2, p.center.Z, C.white)
+	-- Treat displays
+	local treatColors = { Color3.fromRGB(230, 190, 120), Color3.fromRGB(255, 140, 60), Color3.fromRGB(150, 95, 60) }
+	for i, color in treatColors do
+		local z = p.center.Z - 4 + (i - 1) * 4
+		part(m, { Name = "Treat", Shape = Enum.PartType.Ball, Size = Vector3.new(1.2, 0.8, 1.2), CFrame = CFrame.new(p.center.X - 3, 3.75, z), Color = color })
+	end
+	for i = 0, 1 do
+		block(m, "Shelf", Vector3.new(6, 5, 1.5), p.center.X - 4 + i * 8, 0, p.center.Z - 10, C.wood)
+		block(m, "Jar", Vector3.new(1.2, 1.5, 1.2), p.center.X - 5 + i * 8, 5, p.center.Z - 10, Color3.fromRGB(200, 230, 255), { Material = Enum.Material.Glass, Transparency = 0.3 })
+	end
 end
 
 local function buildDogPark(parent: Instance, rng: Random)
@@ -294,6 +340,24 @@ local function buildDogPark(parent: Instance, rng: Random)
 	for _ = 1, 8 do
 		flowers(m, rng:NextNumber(x0 + 3, x1 - 3), rng:NextNumber(z0 + 3, z0 + 10), rng)
 	end
+	-- Interactive props: ball bucket (fetch) and squeaky toys.
+	local bucket = block(m, "BallBucket", Vector3.new(3, 2.4, 3), -60, 0, -22, C.blue, { Shape = Enum.PartType.Cylinder })
+	bucket.CFrame = CFrame.new(-60, 1.2, -22) * CFrame.Angles(0, 0, math.rad(90))
+	bucket.Size = Vector3.new(2.4, 3, 3)
+	CollectionService:AddTag(bucket, "FetchStation")
+	for i = 0, 3 do
+		part(m, { Name = "Ball", Shape = Enum.PartType.Ball, Size = Vector3.one * 0.9, CFrame = CFrame.new(-60.6 + (i % 2) * 1.2, 2.6, -22.6 + math.floor(i / 2) * 1.2), Color = Color3.fromRGB(200, 255, 60) })
+	end
+	sign(m, "🎾 Grab a ball!", CFrame.new(-60, 4.6, -22) * CFrame.Angles(0, math.rad(-90), 0), Vector2.new(4.5, 1), C.green)
+	local duck = part(m, { Name = "SqueakyDuck", Shape = Enum.PartType.Ball, Size = Vector3.one * 1.8, CFrame = CFrame.new(-96, 0.9, -56), Color = C.yellow })
+	part(m, { Name = "DuckHead", Shape = Enum.PartType.Ball, Size = Vector3.one * 1.1, CFrame = CFrame.new(-96, 2.1, -56.5), Color = C.yellow, CanCollide = false })
+	part(m, { Name = "DuckBeak", Size = Vector3.new(0.5, 0.3, 0.6), CFrame = CFrame.new(-96, 2.0, -57.2), Color = C.orange, CanCollide = false })
+	CollectionService:AddTag(duck, "PetToy")
+	local bone = block(m, "ChewBone", Vector3.new(3, 0.6, 0.8), -74, 0, -62, C.white)
+	part(m, { Name = "BoneEnd", Shape = Enum.PartType.Ball, Size = Vector3.one, CFrame = CFrame.new(-75.6, 0.5, -62), Color = C.white })
+	part(m, { Name = "BoneEnd", Shape = Enum.PartType.Ball, Size = Vector3.one, CFrame = CFrame.new(-72.4, 0.5, -62), Color = C.white })
+	CollectionService:AddTag(bone, "PetToy")
+
 	-- Agility-style toys in the park
 	part(m, { Name = "Tire", Shape = Enum.PartType.Cylinder, Size = Vector3.new(0.8, 4, 4), CFrame = CFrame.new(-100, 2, -60), Color = C.dark })
 	part(m, { Name = "BigBall", Shape = Enum.PartType.Ball, Size = Vector3.one * 3, CFrame = CFrame.new(-78, 1.5, -58), Color = C.red })
@@ -308,6 +372,13 @@ local function buildSalon(parent: Instance)
 		block(m, "Tub", Vector3.new(7, 2.5, 5), p.center.X + 2, 0, z, C.white)
 		block(m, "Water", Vector3.new(6, 0.3, 4), p.center.X + 2, 2.3, z, Color3.fromRGB(150, 220, 255), { Material = Enum.Material.Glass, Transparency = 0.3, CanCollide = false })
 		block(m, "Mirror", Vector3.new(6, 5, 0.3), p.center.X + 2, 3, z + (i == 1 and -2.9 or 2.9), Color3.fromRGB(200, 230, 255), { Material = Enum.Material.Glass, Reflectance = 0.3 })
+		local station = block(m, "GroomStation", Vector3.new(7, 0.6, 5), p.center.X + 2, 2.5, z, C.white, { Transparency = 1, CanCollide = false })
+		local spot = Instance.new("Attachment")
+		spot.Name = "DogSpot"
+		spot.Parent = station
+		spot.WorldPosition = Vector3.new(p.center.X + 2, 2.4 + DogRig.GROUND_OFFSET, z)
+		CollectionService:AddTag(station, "GroomStation")
+		sign(m, "🛁 Spa Tub", CFrame.new(p.center.X + 2, 6.5, z + (i == 1 and -2.7 or 2.7)) * CFrame.Angles(0, i == 1 and 0 or math.rad(180), 0), Vector2.new(4, 1), C.purple)
 	end
 	for i = 0, 3 do
 		part(m, { Name = "Bubble", Shape = Enum.PartType.Ball, Size = Vector3.one * (0.6 + i * 0.2), CFrame = CFrame.new(p.center.X + 1 + i, 3.4 + i * 0.6, p.center.Z - 11), Color = Color3.new(1, 1, 1), Transparency = 0.4, CanCollide = false })
@@ -406,7 +477,16 @@ local function buildAgility(parent: Instance)
 	block(m, "AgilityFinish", Vector3.new(8, 4, 9), -30, 0.1, -136, C.white, { Transparency = 1, CanCollide = false })
 	sign(m, "FINISH", CFrame.new(-30, 7, -141) * CFrame.Angles(0, math.rad(180), 0), Vector2.new(6, 1.8), C.dark)
 
-	sign(m, "Agility Course", CFrame.new(-20, 8, -89) * CFrame.Angles(0, math.rad(180), 0), Vector2.new(14, 2.6), C.blue)
+	sign(m, "Training Grounds", CFrame.new(-20, 8, -89) * CFrame.Angles(0, math.rad(180), 0), Vector2.new(14, 2.6), C.blue)
+
+	-- Trick training mat in the infield.
+	local mat = block(m, "TrainingMat", Vector3.new(10, 0.3, 8), -18, 0.1, -118, C.purple)
+	CollectionService:AddTag(mat, "TrainingMat")
+	for i = 0, 3 do
+		block(m, "MatStar", Vector3.new(1, 0.32, 1), -21 + i * 2, 0.1, -118, C.yellow, { Material = Enum.Material.Neon })
+	end
+	sign(m, "⭐ Trick Training", CFrame.new(-18, 5, -122.5) * CFrame.Angles(0, math.rad(180), 0), Vector2.new(7, 1.4), C.purple)
+	block(m, "MatSignPost", Vector3.new(0.4, 4.2, 0.4), -18, 0, -122.7, C.wood)
 	block(m, "SignPost", Vector3.new(0.5, 7, 0.5), -20, 0, -89, C.wood)
 	-- Bleachers
 	for i = 0, 2 do
@@ -419,6 +499,20 @@ local function buildPaths(parent: Instance)
 	block(m, "Avenue", Vector3.new(10, 0.15, 124), 0, 0, -28, C.path)
 	block(m, "CrossStreet", Vector3.new(114, 0.15, 10), 6, 0, -30, C.path)
 	block(m, "StationPath", Vector3.new(10, 0.15, 6), 9, 0, 5, C.path)
+	block(m, "TreatShopPath", Vector3.new(20, 0.15, 6), -14, 0, 14, C.path)
+
+	-- Signpost at the crossroads, readable when walking out of the Pet Store.
+	block(m, "SignPost", Vector3.new(0.6, 12, 0.6), 7, 0, -20, C.wood)
+	local lines = {
+		{ "▲ Training Grounds", C.blue },
+		{ "◀ Sunny Dog Park", C.green },
+		{ "Fluff & Puff Salon ▶", C.pink },
+	}
+	for i, line in lines do
+		sign(m, line[1], CFrame.new(7, 11 - i * 1.7, -19.6) * CFrame.Angles(0, math.rad(180), 0), Vector2.new(7.5, 1.4), line[2])
+	end
+	sign(m, "◀ Bo's Treat Shop", CFrame.new(-7, 4.5, 20) * CFrame.Angles(0, math.rad(180), 0), Vector2.new(6.5, 1.3), C.orange)
+	sign(m, "Ranger HQ ▶", CFrame.new(7, 4.5, 20) * CFrame.Angles(0, math.rad(180), 0), Vector2.new(6.5, 1.3), C.green)
 	for z = 24, -84, -18 do
 		for _, x in { -7, 7 } do
 			block(m, "LampPost", Vector3.new(0.5, 8, 0.5), x, 0, z, C.dark)
@@ -487,7 +581,8 @@ function World.init(_services)
 	local rng = Random.new(7)
 	buildPaths(root)
 	buildPetStore(root)
-	buildRangerStation(root)
+	buildRangerHQ(root)
+	buildTreatShop(root)
 	buildDogPark(root, rng)
 	buildSalon(root)
 	buildAgility(root)

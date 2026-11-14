@@ -26,7 +26,7 @@ local Places: { [string]: Place } = {
 	},
 	ranger_station = {
 		id = "ranger_station",
-		displayName = "Ranger Station",
+		displayName = "Ranger HQ",
 		center = Vector3.new(24, 0, 5),
 		size = Vector3.new(24, 30, 22),
 		color = Color3.fromRGB(46, 160, 120),
@@ -48,9 +48,17 @@ local Places: { [string]: Place } = {
 		color = Color3.fromRGB(255, 120, 190),
 		entrance = Vector3.new(60, 0, -30),
 	},
+	treat_shop = {
+		id = "treat_shop",
+		displayName = "Bo's Treat Shop",
+		center = Vector3.new(-36, 0, 14),
+		size = Vector3.new(24, 30, 22),
+		color = Color3.fromRGB(255, 190, 90),
+		entrance = Vector3.new(-22, 0, 14),
+	},
 	agility = {
 		id = "agility",
-		displayName = "Agility Course",
+		displayName = "Training Grounds",
 		center = Vector3.new(0, 0, -120),
 		size = Vector3.new(100, 40, 60),
 		color = Color3.fromRGB(80, 160, 255),

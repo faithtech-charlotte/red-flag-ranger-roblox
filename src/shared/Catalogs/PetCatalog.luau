@@ -67,6 +67,14 @@ PetCatalog.Slots = {
 	fur = { attachment = nil, label = "Fur" },
 }
 
+--[[
+	Optional uploaded animations, keyed by behavior state (e.g. Sitting,
+	Eating, PerformingTrick). Animate the "dog_basic" rig's Motor6Ds
+	(BodyJoint, Neck, Tail, LegFL/FR/BL/BR) and paste the asset ids here,
+	e.g. Sitting = "rbxassetid://1234567890". Empty = procedural fallback.
+]]
+PetCatalog.AnimationIds = {} :: { [string]: string }
+
 PetCatalog.NameRules = {
 	minLength = 1,
 	maxLength = 16,
