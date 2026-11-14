@@ -16,6 +16,10 @@ rojo build -o "red-flag-ranger-roblox.rbxlx"
 rojo serve
 ```
 
+**No Rojo?** `tools/studio-sync/` pushes the source into an open Studio session through the Roblox Studio MCP server (see its README): build `manifest.json`, serve it on `localhost:34999`, stop Play, then run `sync.luau` with the MCP `execute_luau` tool in the Edit datamodel. It rebuilds the four mapped trees and runs the tests. It does **not** apply `default.project.json` `$properties` (Lighting, etc.); set those by hand in Studio.
+
+**Testing:** run `print(require(game.ServerStorage.Tests)())` in Studio (Edit mode works). Pure logic lives in `src/server/Logic/` and `src/shared/` so it can be tested without a running game. The place is unpublished, so DataStores don't work and the HUD shows "Not saving"; profiles reset every session.
+
 ## Architecture
 
 The project uses Rojo's tree mapping (`default.project.json`) to map source files to Roblox's DataModel:
@@ -39,6 +43,34 @@ See README.md for the game architecture. Key rules:
 - `src/shared/*.luau` - Shared modules require'd by both client and server
 
 **Security:** FilteringEnabled is active, enforcing client/server separation. Server-side code handles authoritative game logic; client-side code handles UI and local interactions.
+
+## The dog (read before touching pet code)
+
+- **Movement:** every dog part is `CanCollide = false`; the dog floats on one `AlignPosition` toward an attachment (`PetService`). Its physics are simulated on the **owner's client**, so client code (e.g. `WorldController`'s world wrap, `BallController`'s chase point) may move it directly.
+- **Behavior is a state machine:** `src/server/Logic/PetStateMachine.luau` defines the states (Following, Sitting, Fetching, ...) and allowed transitions; change state only through `PetService.setState`, which returns a token activities use to check they're still in charge. `PetService.react(player, mood)` sets a short flourish (`Mood`/`MoodAt` attributes) that `PetController` animates on every client.
+- **Recovery:** a Following dog more than 45 studs away is teleported back (200 studs for 6 s after a whistle, so it runs instead). A dog left Sitting/Staying more than 140 studs away is recalled.
+- **Actions:** clients send `PetAction { action = ... }`; `PetInteractionService` validates against `PetActions` (touch distance, cooldown, bond unlocks) before running a handler.
+- **Must stay true:** the dog runs on the ground and never flies. Fetch chases a ground point under the ball, not the ball.
+
+## Gotchas
+
+- **Raycasts:** `CanQuery = false` is ignored on parts that collide, so exclude such parts (e.g. the fetch ball) explicitly with `RaycastParams`.
+- **Collision groups** `FetchBall` and `Characters` already exist; reuse them rather than adding ad-hoc `CanCollide` toggles.
+- **Lighting:** scripts (including MCP `execute_luau`) cannot read or write `Lighting.Technology`. Currently `Voxel`, and no object casts a visible ground shadow under it; a lighting change is being handled separately.
+- **Sounds:** only built-in `rbxasset://sounds/...` are used (`src/client/UI/Sounds.luau`); custom asset ids go in its `CUSTOM` table.
+- **Studio MCP testing:** `screen_capture` works in Play mode; `user_mouse_input` x/y are GUI coordinates (viewport minus the 58 px top inset); `instance_path` clicks need unique names. Adopt a dog in tests with `ReplicatedStorage.Remotes.Request:InvokeServer("adopt", { breedId = "golden", name = "Sparky" })` from the Client datamodel. Short-lived effects (the 1 s "!" bubble) are easier to verify by inspecting instances than by screenshot.
+
+## Controls (current)
+
+- **Whistle:** H / gamepad D-pad Up / the 📣 button (above the jump button on touch) calls the dog back from anywhere (`WhistleController`).
+- **Action bar** (bottom-left, `ActionBarController`): Q / gamepad Y. Planned to be replaced by a tap-the-dog ring menu.
+- Planned: the dog becomes solid to players and obstacles, sidesteps when walked into, and jumps agility hurdles.
+
+## Docs
+
+- `README.md`: game architecture and systems.
+- `docs/interaction-expansion-spec.md` + `docs/developer-handoff.md`: the next large feature spec (encounters, Pet Show, Trail Walk, Wash & Groom).
+- `docs/HANDOFF.md`: latest session handoff notes.
 
 ## Rojo File Naming Conventions
 

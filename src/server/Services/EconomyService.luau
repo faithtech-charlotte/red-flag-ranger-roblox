@@ -16,7 +16,6 @@ local Places = require(ReplicatedStorage.Shared.Places)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local MAX_GRANT = 500
-local SHOP_PLACE = "salon"
 
 local Economy = {}
 local S
@@ -56,10 +55,11 @@ function Economy.spend(player: Player, amount: number): boolean
 	return true
 end
 
-local function atShop(player: Player): boolean
+-- Items are bought at the store that sells them (ItemCatalog.shopOf).
+local function atShop(player: Player, shopId: string): boolean
 	local character = player.Character
 	local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	return hrp ~= nil and Places.isInside(SHOP_PLACE, hrp.Position, 8)
+	return hrp ~= nil and Places.isInside(shopId, hrp.Position, 8)
 end
 
 function Economy.purchase(player: Player, itemId: any): (boolean, string?)
@@ -70,10 +70,11 @@ function Economy.purchase(player: Player, itemId: any): (boolean, string?)
 	if not profile then
 		return false, "Still loading."
 	end
-	if not atShop(player) then
-		return false, "Visit the Fluff & Puff Salon to shop."
-	end
 	local item = ItemCatalog.get(itemId)
+	if item and not atShop(player, ItemCatalog.shopOf(item)) then
+		local place = Places.get(ItemCatalog.shopOf(item))
+		return false, `Visit {place and place.displayName or "the shop"} to buy this.`
+	end
 	local plan, reason = Purchase.plan(profile, item, ItemCatalog.Items, ItemCatalog.MaxStack)
 	if not plan then
 		return false, reason
@@ -86,7 +87,7 @@ function Economy.purchase(player: Player, itemId: any): (boolean, string?)
 			profile.inventory[grantId] = (profile.inventory[grantId] or 0) + 1
 		end
 		if plan.service and it.effect then
-			S.Pet.applyCare(player, it.effect)
+			S.Pet.applyCare(player, it.effect, "care")
 		end
 		EventBus.publish("item.purchased", player, { itemId = it.id, kind = it.kind })
 		-- Show new looks right away: equip what was just bought.

@@ -44,10 +44,24 @@ return {
 		},
 		idleLine = "Welcome to Fluff & Puff!",
 	},
+	bo = {
+		id = "bo",
+		displayName = "Bo",
+		subtitle = "Treat Baker",
+		role = "shopkeeper",
+		interaction = "shop",
+		shop = "treat_shop",
+		promptText = "Shop",
+		appearance = { skin = rgb(160, 110, 75), shirt = rgb(255, 255, 255), pants = rgb(90, 70, 60), hair = rgb(30, 25, 20), hat = rgb(255, 255, 255) },
+		placements = {
+			{ locationId = "treat_shop", position = Vector3.new(-42, 0, 14), faces = Vector3.new(0, 0, 14) },
+		},
+		idleLine = "Fresh treats! Your pup will do a happy dance.",
+	},
 	coach_sam = {
 		id = "coach_sam",
 		displayName = "Coach Sam",
-		subtitle = "Agility Coach",
+		subtitle = "Trainer",
 		role = "trusted_adult",
 		appearance = { skin = rgb(234, 192, 160), shirt = rgb(80, 160, 255), pants = rgb(40, 40, 50), hair = rgb(120, 80, 40), hat = rgb(255, 255, 255) },
 		placements = {
@@ -79,7 +93,7 @@ return {
 			{ locationId = "dog_park", position = Vector3.new(-108, 0, -12), faces = Vector3.new(-90, 0, -40) },
 		},
 		encounters = { "riley_hi", "riley_again" },
-		idleLine = "Hi again!",
+		idleLine = "Hi again! Have you tried the ball bucket? I bet {petName} can catch three in a row!",
 	},
 	jordan = {
 		id = "jordan",

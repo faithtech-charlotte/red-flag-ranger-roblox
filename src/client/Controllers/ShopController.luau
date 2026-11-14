@@ -24,10 +24,17 @@ local subtitleLabel: TextLabel
 local grid: ScrollingFrame
 local tabButtons: { [string]: TextButton } = {}
 local mode: "shop" | "wardrobe" = "shop"
-local tab: "dog" | "me" | "care" = "dog"
+local shopId = "salon"
+local tab: string = "dog"
 local busy = false
+local tabRow: Frame
 
-local TABS = { { id = "dog", label = "🐶 Dog" }, { id = "me", label = "🧢 Me" }, { id = "care", label = "🦴 Care" } }
+local TAB_LABELS = { dog = "🐶 Dog", me = "🧢 Me", care = "🫧 Care", treats = "🦴 Treats" }
+local SHOPS = {
+	salon = { title = "Fluff & Puff Salon", tabs = { "dog", "me", "care" } },
+	treat_shop = { title = "Bo's Treat Shop", tabs = { "treats" } },
+}
+local WARDROBE_TABS = { "dog", "me", "treats" }
 
 local function swatch(item: ItemCatalog.Item): (Color3, string)
 	local v = item.visual
@@ -137,7 +144,7 @@ local function card(data, item: ItemCatalog.Item, order: number)
 			act(Remotes.RequestKinds.Purchase, { itemId = item.id })
 		end
 	else
-		text, bg, onClick = "Buy at the Salon", C.disabled, function() end
+		text, bg, onClick = item.unlockOnly and "Bond reward" or "Buy in town", C.disabled, function() end
 	end
 	Theme.button(text, bg, onClick, { Size = UDim2.new(1, 0, 0, 40), TextSize = 18, LayoutOrder = 4, Parent = frame })
 end
@@ -162,6 +169,9 @@ local function render()
 		if item.tab ~= tab then
 			return false
 		end
+		if mode == "shop" and (item.unlockOnly or ItemCatalog.shopOf(item) ~= shopId) then
+			return false
+		end
 		if mode == "wardrobe" then
 			if item.kind == "service" or item.kind == "bundle" then
 				return false
@@ -174,18 +184,35 @@ local function render()
 		card(data, item, i)
 	end
 	if #items == 0 then
-		Theme.label(mode == "wardrobe" and "Nothing here yet. Visit the Fluff & Puff Salon!" or "Coming soon!", {
+		Theme.label(mode == "wardrobe" and "Nothing here yet. Visit the shops in town!" or "Coming soon!", {
 			Size = UDim2.new(1, 0, 0, 40),
 			Parent = grid,
 		})
 	end
 end
 
-function Shop.open(which: "shop" | "wardrobe", line: string?)
+local function buildTabs(ids: { string })
+	for _, b in tabButtons do
+		b:Destroy()
+	end
+	table.clear(tabButtons)
+	for i, id in ids do
+		tabButtons[id] = Theme.button(TAB_LABELS[id] or id, C.disabled, function()
+			tab = id
+			render()
+		end, { Size = UDim2.fromOffset(120, 44), LayoutOrder = i, TextSize = 20, Parent = tabRow })
+	end
+	tab = ids[1]
+end
+
+function Shop.open(which: "shop" | "wardrobe", line: string?, npcName: string?, whichShop: string?)
 	mode = which
+	shopId = whichShop or "salon"
 	overlay.Visible = true
-	titleLabel.Text = which == "shop" and "Fluff & Puff Salon" or "Wardrobe"
-	subtitleLabel.Text = line and `Priya: "{line}"` or (which == "shop" and "Pick something fun!" or "Mix and match your looks.")
+	local shop = SHOPS[shopId] or SHOPS.salon
+	titleLabel.Text = which == "shop" and shop.title or "Wardrobe"
+	buildTabs(which == "shop" and shop.tabs or WARDROBE_TABS)
+	subtitleLabel.Text = line and `{npcName or "Shopkeeper"}: "{line}"` or (which == "shop" and "Pick something fun!" or "Mix and match your looks.")
 	render()
 	Theme.pop(overlay:FindFirstChild("Panel") :: GuiObject)
 	if UserInputService.GamepadEnabled then
@@ -226,19 +253,13 @@ function Shop.start(gui: ScreenGui, controllers)
 	subtitleLabel = Theme.label("", { TextSize = 16, TextColor3 = C.inkSoft, Size = UDim2.new(1, -60, 0, 20), Position = UDim2.fromOffset(0, 38), TextXAlignment = Enum.TextXAlignment.Left, Parent = panel })
 	Theme.button("✕", C.inkSoft, Shop.close, { Size = UDim2.fromOffset(48, 44), Position = UDim2.new(1, -48, 0, 0), Parent = panel })
 
-	local tabs = new("Frame", {
+	tabRow = new("Frame", {
 		Size = UDim2.new(1, 0, 0, 44),
 		Position = UDim2.fromOffset(0, 66),
 		BackgroundTransparency = 1,
 		Parent = panel,
 		Children = { Theme.list(Enum.FillDirection.Horizontal, 8, Enum.HorizontalAlignment.Left) },
-	})
-	for i, t in TABS do
-		tabButtons[t.id] = Theme.button(t.label, C.disabled, function()
-			tab = t.id :: any
-			render()
-		end, { Size = UDim2.fromOffset(120, 44), LayoutOrder = i, TextSize = 20, Parent = tabs })
-	end
+	}) :: Frame
 
 	grid = new("ScrollingFrame", {
 		Position = UDim2.fromOffset(0, 120),
@@ -260,7 +281,7 @@ function Shop.start(gui: ScreenGui, controllers)
 	State.changed:Connect(render)
 	State.push:Connect(function(kind, payload)
 		if kind == Remotes.PushKinds.OpenShop then
-			Shop.open("shop", payload and payload.line)
+			Shop.open("shop", payload and payload.line, payload and payload.npcName, payload and payload.shop)
 		end
 	end)
 end

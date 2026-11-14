@@ -1,14 +1,14 @@
 --[[
 	HUDController: coins, next objective, toasts, celebrations, and the side
-	buttons (Wardrobe, Pet care, Help). Help is ALWAYS visible.
+	buttons (My Dog, Missions, Wardrobe, Help). Help is ALWAYS visible.
 ]]
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local SoundService = game:GetService("SoundService")
 
 local QuestCatalog = require(ReplicatedStorage.Shared.Catalogs.QuestCatalog)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local State = require(script.Parent.State)
+local Sounds = require(script.Parent.Parent.UI.Sounds)
 local Theme = require(script.Parent.Parent.UI.Theme)
 
 local C = Theme.Colors
@@ -21,19 +21,14 @@ local coinLabel: TextLabel
 local saveChip: Frame
 local objectiveTitle: TextLabel
 local objectiveHint: TextLabel
+local lastObjective = ""
+local objectiveShownAt = 0
 local toastList: Frame
-local carePanel: Frame
 local helpPanel: Frame
 local petButton: TextButton
 
 local function playChime()
-	local s = Instance.new("Sound")
-	s.SoundId = "rbxasset://sounds/electronicpingshort.wav"
-	s.Volume = 0.5
-	SoundService:PlayLocalSound(s)
-	task.delay(2, function()
-		s:Destroy()
-	end)
+	Sounds.play("chime")
 end
 
 function HUD.toast(text: string, style: string?)
@@ -66,7 +61,7 @@ function HUD.toast(text: string, style: string?)
 	end)
 end
 
-function HUD.celebrate(title: string, coins: number?)
+function HUD.celebrate(title: string, coins: number?, subtitle: string?)
 	playChime()
 	local banner = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
@@ -82,7 +77,8 @@ function HUD.celebrate(title: string, coins: number?)
 			Theme.list(nil, 4),
 			new("UISizeConstraint", { MaxSize = Vector2.new(440, 400) }),
 			Theme.label("🎉 " .. title, { Font = Theme.Fonts.title, TextSize = 30, Size = UDim2.new(1, 0, 0, 38), LayoutOrder = 1 }),
-			coins and Theme.label(`+{coins} Paw Coins`, { Font = Theme.Fonts.title, TextSize = 22, TextColor3 = C.orange, LayoutOrder = 2 }) or nil,
+			subtitle and Theme.label(subtitle, { Font = Theme.Fonts.bold, TextSize = 18, LayoutOrder = 2, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y }) or nil,
+			coins and Theme.label(`+{coins} Paw Coins`, { Font = Theme.Fonts.title, TextSize = 22, TextColor3 = C.orange, LayoutOrder = 3 }) or nil,
 		},
 	}) :: Frame
 	Theme.pop(banner)
@@ -141,30 +137,6 @@ local function clear(body: Instance)
 	end
 end
 
-local function renderCare()
-	local data = State.data
-	local body = carePanel:FindFirstChild("Body") :: Frame
-	clear(body)
-	if not data or not data.pet then
-		Theme.label("Adopt a dog at the Pet Store first!", { Parent = body })
-		return
-	end
-	local pet = data.pet
-	local level = 1 + math.floor(pet.bond / 5)
-	Theme.label(`{pet.name} the {pet.breedName}`, { Font = Theme.Fonts.title, TextSize = 22, Parent = body, LayoutOrder = 1 })
-	Theme.label(`Friendship level {level}  {string.rep("♥", math.min(level, 10))}`, { TextColor3 = C.pink, Font = Theme.Fonts.bold, Parent = body, LayoutOrder = 2 })
-	Theme.button("Pet " .. pet.name, C.pink, function()
-		State.request(Remotes.RequestKinds.PetPet)
-	end, { Parent = body, LayoutOrder = 3 })
-	local treats = data.inventory.treat_biscuit or 0
-	Theme.button(`Give a treat ({treats})`, treats > 0 and C.orange or C.disabled, function()
-		local ok, err = State.request(Remotes.RequestKinds.UseItem, { itemId = "treat_biscuit" })
-		if not ok and err then
-			HUD.toast(err == "You don't have any left." and "Buy treats at the Salon!" or err)
-		end
-	end, { Parent = body, LayoutOrder = 4 })
-end
-
 local function renderHelp()
 	local data = State.data
 	local body = helpPanel:FindFirstChild("Body") :: Frame
@@ -206,6 +178,26 @@ local function renderHelp()
 	})
 end
 
+-- Hide the HUD's buttons and objective during hands-on play (petting).
+-- The Help button is never in this list.
+local focusFrames: { GuiObject } = {}
+function HUD.setFocus(on: boolean)
+	for _, f in focusFrames do
+		f.Visible = not on
+	end
+end
+
+function HUD.showObjectiveHint()
+	objectiveHint.Visible = true
+	objectiveShownAt = os.clock()
+	local at = objectiveShownAt
+	task.delay(7, function()
+		if objectiveShownAt == at then
+			objectiveHint.Visible = false
+		end
+	end)
+end
+
 local function renderObjective()
 	local data = State.data
 	if not data then
@@ -228,8 +220,11 @@ local function renderObjective()
 		objectiveTitle.Text = "Explore with your dog!"
 		objectiveHint.Text = "Earn Paw Coins for new looks. Jordan, Riley and friends are around."
 	end
-	if carePanel.Visible then
-		renderCare()
+	-- Show the hint when the objective changes, then tuck it away so the
+	-- screen stays clear. Tapping the card shows it again.
+	if objectiveTitle.Text ~= lastObjective then
+		lastObjective = objectiveTitle.Text
+		HUD.showObjectiveHint()
 	end
 	if helpPanel.Visible then
 		renderHelp()
@@ -277,6 +272,11 @@ function HUD.start(screenGui: ScreenGui, ctl)
 	}) :: Frame
 	objectiveTitle = Theme.label("Loading…", { Font = Theme.Fonts.title, TextSize = 22, LayoutOrder = 1, Parent = objective, Size = UDim2.new(1, 0, 0, 26) })
 	objectiveHint = Theme.label("", { TextSize = 16, TextColor3 = C.inkSoft, LayoutOrder = 2, Parent = objective, Size = UDim2.new(1, 0, 0, 20) })
+	objective.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			HUD.showObjectiveHint()
+		end
+	end)
 
 	toastList = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0),
@@ -292,28 +292,33 @@ function HUD.start(screenGui: ScreenGui, ctl)
 	local side = new("Frame", {
 		AnchorPoint = Vector2.new(1, 0.5),
 		Position = UDim2.new(1, -12, 0.5, 0),
-		Size = UDim2.fromOffset(150, 170),
+		Size = UDim2.fromOffset(150, 240),
 		BackgroundTransparency = 1,
 		Parent = gui,
 		Children = { Theme.list(nil, 10) },
 	})
-	carePanel = popup("My Dog", C.pink)
 	helpPanel = popup("Help & Safety", C.help)
-	sideButton("👕 Wardrobe", C.purple, 1, function()
-		controllers.Shop.open("wardrobe")
-	end).Parent = side
-	petButton = sideButton("🐶 My Dog", C.pink, 2, function()
+	petButton = sideButton("🐶 My Dog", C.pink, 1, function()
 		helpPanel.Visible = false
-		carePanel.Visible = not carePanel.Visible
-		renderCare()
+		controllers.ActionBar.toggle()
 	end)
 	petButton.Parent = side
-	sideButton("💙 Help", C.help, 3, function()
-		carePanel.Visible = false
+	local missionsButton = sideButton("📜 Missions", C.green, 2, function()
+		controllers.Missions.open()
+	end)
+	missionsButton.Parent = side
+	local wardrobeButton = sideButton("👕 Wardrobe", C.purple, 3, function()
+		controllers.Shop.open("wardrobe")
+	end)
+	wardrobeButton.Parent = side
+	sideButton("💙 Help", C.help, 4, function()
+		controllers.ActionBar.close()
 		helpPanel.Visible = not helpPanel.Visible
 		renderHelp()
 	end).Parent = side
 
+	-- Help stays out of this list: it must never be hidden, even while petting.
+	focusFrames = { objective :: GuiObject, petButton :: GuiObject, missionsButton :: GuiObject, wardrobeButton :: GuiObject }
 	State.changed:Connect(renderObjective)
 	if State.data then
 		renderObjective()
@@ -322,7 +327,7 @@ function HUD.start(screenGui: ScreenGui, ctl)
 		if kind == Remotes.PushKinds.Toast then
 			HUD.toast(payload.text, payload.style)
 		elseif kind == Remotes.PushKinds.Celebrate then
-			HUD.celebrate(payload.title, payload.coins)
+			HUD.celebrate(payload.title, payload.coins, payload.subtitle)
 		end
 	end)
 end

@@ -10,7 +10,7 @@
 
 local ProfileSchema = {}
 
-ProfileSchema.CURRENT_VERSION = 1
+ProfileSchema.CURRENT_VERSION = 2
 
 export type PetInstance = {
 	id: string,
@@ -18,7 +18,8 @@ export type PetInstance = {
 	name: string, -- raw name as typed; always filtered before display
 	displayName: string, -- last filtered name (safe to show)
 	equipped: { [string]: string }, -- slot -> itemId
-	bond: number,
+	bondXp: number, -- never decreases
+	xpLog: { day: number, counts: { [string]: number } }, -- daily XP caps
 	adoptedAt: number,
 }
 
@@ -70,8 +71,33 @@ end
 
 -- Migration steps: migrations[n] upgrades a version-n profile to n+1.
 local migrations: { [number]: (any) -> any } = {
-	-- [1] = function(data) ... return data end,
+	-- v1 -> v2: pets get Bond XP. Old "bond" points convert at 5 XP each,
+	-- so nobody loses progress.
+	[1] = function(data)
+		for _, pet in data.pets or {} do
+			if pet.bondXp == nil then
+				pet.bondXp = math.max(0, math.floor((tonumber(pet.bond) or 0) * 5))
+			end
+			pet.bond = nil
+			pet.xpLog = pet.xpLog or { day = 0, counts = {} }
+		end
+		return data
+	end,
 }
+
+-- A new pet record (used at adoption).
+function ProfileSchema.newPet(id: string, breedId: string, name: string, now: number): PetInstance
+	return {
+		id = id,
+		breedId = breedId,
+		name = name,
+		displayName = name,
+		equipped = {},
+		bondXp = 0,
+		xpLog = { day = 0, counts = {} },
+		adoptedAt = now,
+	}
+end
 
 local function deepCopy(value: any): any
 	if typeof(value) ~= "table" then

@@ -26,8 +26,13 @@ Remotes.RequestKinds = {
 	Equip = "equip",
 	Unequip = "unequip",
 	UseItem = "useItem",
-	PetPet = "petPet",
-	ThrowBall = "throwBall",
+	PetAction = "petAction",
+	PetEnd = "petEnd",
+	FetchThrow = "fetchThrow",
+	FetchReady = "fetchReady",
+	GroomStep = "groomStep",
+	ActivityCancel = "activityCancel",
+	TrainPress = "trainPress",
 	DialogueChoose = "dialogueChoose",
 	DialogueClose = "dialogueClose",
 	DialogueSafety = "dialogueSafety",
@@ -47,6 +52,12 @@ Remotes.PushKinds = {
 	Agility = "agility",
 	Waypoint = "waypoint",
 	Celebrate = "celebrate",
+	Bond = "bond",
+	Petted = "petted",
+	FetchAim = "fetchAim",
+	Grooming = "grooming",
+	Training = "training",
+	OpenMissions = "openMissions",
 }
 
 function Remotes.create(): (RemoteFunction, RemoteEvent)

@@ -21,6 +21,9 @@ function Purchase.plan(profile, item, catalog, maxStack: number): (Plan?, string
 	if not item then
 		return nil, "That item doesn't exist."
 	end
+	if item.unlockOnly then
+		return nil, "This one is earned by bonding with your dog!"
+	end
 	if typeof(item.price) ~= "number" or item.price < 0 or item.price ~= math.floor(item.price) then
 		return nil, "That item isn't for sale."
 	end

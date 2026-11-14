@@ -24,7 +24,13 @@ local controllers = {
 	Dialogue = require(Controllers.DialogueController),
 	Shop = require(Controllers.ShopController),
 	Pet = require(Controllers.PetController),
+	ActionBar = require(Controllers.ActionBarController),
+	Petting = require(Controllers.PettingController),
+	Ball = require(Controllers.BallController),
+	Activity = require(Controllers.ActivityController),
+	Missions = require(Controllers.MissionsController),
 	World = require(Controllers.WorldController),
+	Whistle = require(Controllers.WhistleController),
 }
 
 controllers.HUD.start(gui, controllers)
@@ -32,4 +38,10 @@ controllers.Dialogue.start(gui, controllers)
 controllers.Shop.start(gui, controllers)
 controllers.Adoption.start(gui, controllers)
 controllers.Pet.start()
+controllers.ActionBar.start(gui, controllers)
+controllers.Petting.start(gui, controllers)
+controllers.Ball.start(gui, controllers)
+controllers.Activity.start(gui, controllers)
+controllers.Missions.start(gui, controllers)
 controllers.World.start(gui, controllers)
+controllers.Whistle.start(gui, controllers)

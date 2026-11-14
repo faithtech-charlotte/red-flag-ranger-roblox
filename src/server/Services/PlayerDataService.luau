@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ProfileSchema = require(script.Parent.Parent.Data.ProfileSchema)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local PetCatalog = require(ReplicatedStorage.Shared.Catalogs.PetCatalog)
+local BondCatalog = require(ReplicatedStorage.Shared.Catalogs.BondCatalog)
 
 local STORE_NAME = "RFR_PlayerProfiles_v1"
 local SESSION_STALE_SECONDS = 300
@@ -220,16 +221,27 @@ function Data.snapshot(player: Player)
 	for id, a in data.activities do
 		activities[id] = { count = a.count, best = a.best }
 	end
-	return {
-		coins = data.wallet.paw_coins or 0,
-		pet = pet and {
+	local petView = nil
+	if pet then
+		local level, into, need = BondCatalog.levelFor(pet.bondXp)
+		local nextUnlock = BondCatalog.nextUnlock(level)
+		petView = {
 			id = pet.id,
 			breedId = pet.breedId,
 			name = pet.displayName,
 			equipped = table.clone(pet.equipped),
-			bond = pet.bond,
+			bondXp = pet.bondXp,
+			level = level,
+			xpInto = into,
+			xpNeed = need,
+			nextUnlock = nextUnlock and { level = nextUnlock.level, label = nextUnlock.label } or nil,
 			breedName = (PetCatalog.get(pet.breedId) or { displayName = "Dog" }).displayName,
-		},
+		}
+	end
+	return {
+		coins = data.wallet.paw_coins or 0,
+		pet = petView,
+		cooldowns = S.Interaction.cooldowns(player),
 		inventory = table.clone(data.inventory),
 		playerEquipped = table.clone(data.playerEquipped),
 		quests = table.clone(data.quests),

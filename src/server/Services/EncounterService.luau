@@ -199,7 +199,11 @@ function Encounter.interact(player: Player, model: Model)
 	end
 	if npcDef.interaction == "shop" then
 		endSession(player)
-		S.Net.push(player, Remotes.PushKinds.OpenShop, { npcName = npcDef.displayName, line = npcDef.idleLine })
+		S.Net.push(player, Remotes.PushKinds.OpenShop, {
+			npcName = npcDef.displayName,
+			line = npcDef.idleLine,
+			shop = npcDef.shop or "salon",
+		})
 		return
 	end
 	if npcDef.interaction == "adopt" and not profile.activePetId then
