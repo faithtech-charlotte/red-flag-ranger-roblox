@@ -1,8 +1,8 @@
 # Red Flag Rangers
 
-A Roblox pet adventure (ages 9 to 13) built for the FaithTech hackathon with Present Age Ministries. Players adopt a dog, play, earn Paw Coins, dress up their pup, and meet NPCs. One NPC's story gently practices recognizing and responding to online grooming warning signs.
+A Roblox pet adventure (ages 9 to 13) built for the FaithTech hackathon with Present Age Ministries. Players adopt a dog, play, earn Paw Coins, dress up their pup, and meet NPCs. Short practice stories with labeled story characters gently practice recognizing and responding to online grooming warning signs.
 
-> All educational dialogue is **provisional** until Present Age reviews it. It lives in `src/server/Content/Encounters.luau`.
+> All educational dialogue is **provisional** until Present Age reviews it. It lives in `src/server/Content/Encounters.luau` and `src/server/Content/Campaign/` (transcribed from `docs/campaign-script.md`).
 
 ## Run it
 
@@ -21,10 +21,10 @@ A Roblox pet adventure (ages 9 to 13) built for the FaithTech hackathon with Pre
 | Step | Where | What happens |
 |---|---|---|
 | Adopt | Pet Store (spawn) | Pick one of 3 breeds, name it (filtered by `TextService`). The dog follows you. |
-| Fetch | Sunny Dog Park (left) | Press **Throw** (or F / gamepad X) 3 times. Earns coins and unlocks the Agility Course. Jordan and Riley are here. |
+| Fetch | Sunny Dog Park (left) | Press **Throw** (or F / gamepad X) 3 times. Earns coins. Riley and Jordan are here (Jordan is an ordinary peer now; his old story arc is unscheduled while the campaign runs). |
 | Shop | Fluff & Puff Salon (right) | Talk to Priya. Buy a collar, fur color, hat, vest, leash, treats, or a matching cap bundle. It's put on right away. |
-| Agility | Agility Course (straight ahead) | START pad, 4 rings in order, FINISH. Jordan shows up here after. |
-| Jordan | Agility Course | After one more activity, Jordan asks to move to Snapchat and keep it secret. |
+| Agility | Agility Course (straight ahead) | START pad, 4 rings in order, FINISH. |
+| Practice stories | Anywhere, between activities | After adoption Ranger Lee welcomes you by radio and Cadet Cara says hi. Then, at most one invitation between activities: Sparkz_Pup says hi (E1), Riley offers a race, Sparkz_Pup asks for your school (E2). See below. |
 | Help | Ranger Station, or the **💙 Help** button | Ranger Lee is always available. Never locked, never rewarded. |
 
 A yellow beam points to the next Ranger Journal objective.
@@ -49,6 +49,17 @@ A yellow beam points to the next Ranger Journal objective.
 
 **Animations** are procedural (no uploaded assets). To use real animations, put asset ids in `PetCatalog.AnimationIds` keyed by state; the procedural pose is the fallback.
 
+## Practice stories (Phase 2)
+
+| Piece | How it works |
+|---|---|
+| **Onboarding** | Right after adoption Ranger Lee calls by park radio (welcome + "Some park characters have practice stories. They're labeled Story character."), then Cadet Cara and her dog Pickles say hi. |
+| **Invitations** | Between activities, at most one card: "Sparkz_Pup is waving at you. (Story character)" with **Talk / Later / Skip this story**. Never during an activity, a dialogue, petting, or an open shop, journal, adoption or Help panel. Later waits for the next completed activity; Skip skips that scene only. At least 90 s of active play between invitations. `Logic/EncounterScheduler` decides; `Services/StoryService` shows the card. |
+| **Scenes** | `park_e1_hello` (friendly, nothing concerning), `green_riley` (a healthy friend who accepts no), `park_e2_deal` (asks for your school, then offers 500 Paw Coins for your town), plus `cara_talk_1`. Any scene can also be started by walking up to its character while it's open. |
+| **Sparkz_Pup** | A story-only NPC in the dog park: visible to a player only while one of their Sparkz beats is open, never once blocked. Its dog is a client-only copy of your own breed (`Client/Controllers/StoryDog`). Blocking Sparkz resolves the beat and skips the later Sparkz beats. |
+| **Cara** | Offers one follow-up card after a beat ("Cara waves." Talk / Not now): a look back, telling her, or "Let's talk to Lee together" (a waypoint to Ranger HQ; Help works from anywhere). Walk up to her later to practice a story: `rp_e2_deal`, with the same evidence as E2. Cara can be blocked; Lee's Help menu can open the practice too. |
+| **Lee's tell menu** | `Logic/LeeTell`. Only facts actually shown, each removed once told; "I'm not sure", "I agreed at first" and "That's all I want to say" always work. Telling one fact is enough. |
+
 ## Playing with your dog (feel overhaul)
 
 - **Whistle:** always on screen once you have a dog. H / gamepad D-pad Up / the 📣 button (above the jump button on touch screens) calls your dog back from anywhere: a chirp, a "!" over the dog, and it drops whatever it was doing and runs to you. During an activity the first press (or Sit / Stay / Come) asks "Stop <activity>? Press again"; a second press within 3 s stops it.
@@ -72,13 +83,16 @@ src/shared/   ReplicatedStorage.Shared       (client + server)
 src/server/   ServerScriptService.Server
   Core/       Net (routing + rate limits), EventBus, ActionService
   Data/       ProfileSchema (versioned profile + migrations)
-  Logic/      EncounterEngine, Conditions, Purchase   ← pure, unit-tested
-  Content/    NPCs, Encounters, StoryArcs             ← writers/reviewers edit here
+  Logic/      EncounterEngine, Conditions, Purchase, EncounterScheduler,
+              LearningProgress, LeeTell, StoryRules, ContentCheck   ← pure, unit-tested
+  Content/    NPCs, Encounters, StoryArcs, ScoreRules,
+              Campaign/ (scenes, facts, shared conventions)  ← writers/reviewers edit here
   Services/   PlayerData, Economy, Inventory, Pet, PetAppearance,
-              Activity, Quest, NPC, Encounter, WorldBuilder
+              Activity, Quest, NPC, Encounter, InteractionState,
+              Progression, Story, WorldBuilder
 
 src/client/   StarterPlayerScripts.Client
-  Controllers/ State, HUD, Adoption, Dialogue, Shop, Pet (animation), World (waypoint, fetch, blocked NPCs)
+  Controllers/ State, HUD, Adoption, Dialogue, Shop, Pet (animation), World (waypoint, fetch, NPC visibility), StoryDog
   UI/Theme    colors + UI helpers
 
 tests/        ServerStorage.Tests
@@ -88,7 +102,7 @@ tests/        ServerStorage.Tests
 
 - **Client → server:** `Request:InvokeServer(kind, payload)`. Every kind is rate-limited and validated. The client only sends ids (item id, choice id); the server decides every outcome.
 - **Server → client:** `Push` sends a fresh profile snapshot after every change, plus toasts, dialogue nodes, and so on.
-- **Events** (`EventBus`): something happened. `pet.adopted`, `activity.completed`, `item.purchased`, `item.equipped`, `quest.completed`, `encounter.completed`. Quests and Jordan's story listen to these.
+- **Events** (`EventBus`): something happened. `pet.adopted`, `activity.completed`, `item.purchased`, `item.equipped`, `quest.completed`, `encounter.completed`, `encounter.exited`, `encounter.closed`, `encounter.facts_presented`. Quests and the practice-story campaign listen to these.
 - **Actions** (`ActionService`): named commands content can trigger, such as `grant_currency`, `equip_item`, `unlock_activity`, `simulate_block`, `simulate_report`, `open_help`, `pet_react`. Unknown action names are flagged at startup and in tests.
 
 **NPC encounters** (the core abstraction)
@@ -103,10 +117,10 @@ To add an encounter: add an entry to `Encounters.luau`, reference it from an NPC
 
 ## Safety design choices
 
-- Block / Report / Get help appear in **every** conversation with a peer NPC (Riley too), like real chat tools. They aren't "the right answers" to a quiz.
-- Agreeing to Jordan's request leads to a gentle chance to reconsider. It is never punished. Every path ends on a short, supportive Ranger Tip, and the player keeps all rewards.
-- Practice Block/Report clearly say they don't contact Roblox, and explain the real Roblox tools.
-- Help-seeking is never gated or rewarded. Learning data is minimal booleans (`profile.learning`); there is no score.
+- Every conversation has Leave and Ask Lee for help. Story characters and peers (Riley too) also have Block (practice) and Report (practice), like real chat tools, and story scenes add "Something feels off". They aren't "the right answers" to a quiz. The first time Block/Report appear, a one-time card explains they're practice and send nothing.
+- A simulated agreement never plays out: Cara pauses the story, says nothing was shared, and offers Try again / Keep playing / Talk to Lee. Nobody is scolded, and no coins are ever given for safety choices.
+- Help is never gated. After a concerning request, Help (or "I'm going to ask Lee") ends the scene and opens Lee's tell menu, which lists only what the player actually saw; "That's all I want to say" ends it at any point.
+- Learning evidence is a private, fixed 30-point ledger on the server (`profile.learningV2`, `Content/ScoreRules`). Nothing learning-related reaches the client except which story character is present.
 - The dog comforts and celebrates. It never "detects" anyone.
 - No real-money purchases, no free-text chat with NPCs, no generated dialogue.
 

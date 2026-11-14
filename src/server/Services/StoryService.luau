@@ -38,6 +38,8 @@ local S
 local loadedAt: { [Player]: number } = {}
 local walks: { [Player]: { beat: string, untilTime: number } } = {}
 local pendingFollowUp: { [Player]: { beat: string, untilTime: number } } = {}
+-- Completed-activity count when an ambient card was put off (in memory).
+local ambientDeferredAt: { [Player]: number } = {}
 
 -- Beats that have a live scene in this build ({ [beat] = true }).
 local available: { [string]: boolean } = {}
@@ -70,6 +72,11 @@ end
 function Story.ambient(player: Player): string?
 	local profile = S.Data.get(player)
 	if not profile then
+		return nil
+	end
+	-- "Later" waits for the next completed activity, with no nagging.
+	local deferredAt = ambientDeferredAt[player]
+	if deferredAt and profile.campaign.completedActivities <= deferredAt then
 		return nil
 	end
 	return StoryRules.ambientFor(profile.campaign, flags(profile), profile.npcs)
@@ -157,6 +164,8 @@ function Story.onCard(player: Player, card, choiceId: string)
 	elseif card.kind == "ambient" then
 		if choiceId == "talk" then
 			S.Encounter.startScene(player, card.sceneId)
+		elseif choiceId == "later" then
+			ambientDeferredAt[player] = profile.campaign.completedActivities
 		elseif choiceId == "skip" then
 			flags(profile).seen[card.sceneId] = true
 			S.Data.checkpoint(player, "story")
@@ -173,6 +182,12 @@ end
 -- else (another panel, Help, a new conversation, leaving) only interrupts,
 -- and the pacing gap keeps it from coming straight back.
 function Story.onCardDismissed(player: Player, card, kind: string)
+	if card.kind == "ambient" and kind == "walk_away" then
+		local profile = S.Data.get(player)
+		if profile then
+			ambientDeferredAt[player] = profile.campaign.completedActivities
+		end
+	end
 	if card.kind ~= "campaign" then
 		return
 	end
@@ -327,6 +342,7 @@ function Story.start()
 		loadedAt[player] = nil
 		walks[player] = nil
 		pendingFollowUp[player] = nil
+		ambientDeferredAt[player] = nil
 	end)
 end
 

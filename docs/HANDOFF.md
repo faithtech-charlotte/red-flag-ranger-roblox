@@ -27,6 +27,11 @@ Read `CLAUDE.md`, then `docs/implementation-plan.md` (r3, Codex-approved; the so
 
 Phase 0 and Phase 1: **Codex APPROVE**. 138 tests pass in Studio; clean boot. Story invitations are intentionally OFF (`ProgressionService.INVITATIONS_ENABLED = false`) until Phase 2.
 
+## Update: Track B is on the branch; Phase 2 built, not yet run
+
+- Track B (Trail Walk, Wash & Groom, whistle confirm) is committed (8bf0081..3fddcd7); 167 tests passed in Studio. The "Next step 1" section below is history.
+- Phase 2 (story vertical slice) was built by an agent on a worktree branch off 90e7112 and has **not been synced or run** yet. It adds `Content/Campaign/*`, `Logic/LeeTell`, `Logic/StoryRules`, `Services/StoryService`, `Client/Controllers/StoryDog`, campaign support in `EncounterService`, and turns invitations on. New specs: `LeeTell`, `StoryRules`, `StoryFlow`, `Campaign` (plus additions to ContentCheck, EncounterEngine, EncounterScheduler, ProgressionRules, Privacy). Next: sync, run the tests, Codex review of the diff, then the plan's Phase 2 "Verify in Studio" list.
+
 ## Next step 1: integrate Track B (minigames), NOT yet on the branch
 
 Built by an agent in worktree branch `worktree-agent-a196ee3313227a43a` (based on 5322a81), **never run**. Commits, in order: `f973cfc` (Trail/Groom/Ratings rules + tests), `ca20139` (Trail Walk, hands-on Wash & Groom, activity ratings), `c1d3460` (whistle/command confirm, client-side), `820fcff` (agility unlocked at adoption), `1c31e34` (README/CLAUDE.md).
