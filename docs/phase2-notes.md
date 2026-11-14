@@ -98,6 +98,17 @@ Full suite 248/248. Codex Phase 2 review: APPROVE after 4 rounds (fixes in 79a71
 | 23 | Pass: "Thanks for trying that again" |
 | 24 | Pass: starting a spa closes the open card |
 
-Not run yet (each needs a fresh E2, so a new Play): 5, 6, 7 (live), 8, 10 (not observable on the client), 11, 13, 16, 18, 20, 21.
+Run A (after merging main, 275/275 tests):
+
+| # | Result |
+|---|---|
+| 11 | Pass: shop panel open 60 s after an activity, no card; card 2.6 s after closing |
+| 13 | Pass: "Let's talk to Lee together" sets the Ranger HQ waypoint (180 s); arriving opens "Hi, you two. Cara said you wanted to talk." |
+| 21 | Pass: in Ranger HQ with the journal open, Lee waits; opens when the journal closes |
+| Trail + jump obstacles | Pass: all 10 markers, no stuck legs, 2 steady squirrels, 3 stars |
+
+Not run yet (each needs a fresh E2, so a new Play): 5, 6, 7 (live), 8, 16, 18, 20. 10 is not observable on the client (covered by tests).
+
+Also seen: Riley's invitation card has no "Story character" label (Sparkz's and Cara's do); Riley's skip line says "practice it with Cara anytime" though Riley's beat is a healthy one.
 
 Found: the Rinse step's 💧 renders as an empty box; the spa prompt sometimes doesn't show after a teleport until the character moves.
