@@ -25,6 +25,7 @@ local services = {
 	NPC = require(Services.NPCService),
 	Encounter = require(Services.EncounterService),
 	InteractionState = require(Services.InteractionState),
+	Progression = require(Services.ProgressionService),
 }
 
 local order = {
@@ -42,6 +43,7 @@ local order = {
 	"NPC",
 	"Encounter",
 	"InteractionState",
+	"Progression",
 }
 
 for _, name in order do

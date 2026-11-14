@@ -91,6 +91,33 @@ evaluators.arcFlag = function(c, ctx)
 	return ctx.arc ~= nil and ctx.arc.flags[c.key] == c.equals
 end
 
+-- Practice-story campaign (profile.campaign is EncounterScheduler state;
+-- profile.learningV2 is LearningProgress state). Read-only checks.
+evaluators.campaignBeat = function(c, ctx)
+	local campaign = ctx.profile.campaign
+	local status = campaign and campaign.beats and campaign.beats[c.beat] or "not_started"
+	if c.statuses then
+		return table.find(c.statuses, status) ~= nil
+	end
+	return status == c.status
+end
+
+evaluators.showEligible = function(_c, ctx)
+	local campaign = ctx.profile.campaign
+	return campaign ~= nil and (campaign.completedActivities or 0) >= 4
+end
+
+evaluators.factSeen = function(c, ctx)
+	local ledger = ctx.profile.learningV2
+	local facts = ledger and ledger.seenFacts and ledger.seenFacts[c.beat]
+	return facts ~= nil and facts[c.fact] == true
+end
+
+evaluators.hasTitle = function(c, ctx)
+	local ledger = ctx.profile.learningV2
+	return ledger ~= nil and ledger.titles ~= nil and ledger.titles[c.title] == true
+end
+
 function Conditions.knownTypes(): { [string]: boolean }
 	local set = {}
 	for k in evaluators do

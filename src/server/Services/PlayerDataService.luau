@@ -277,17 +277,12 @@ function Data.onLoaded(cb: (Player, ProfileSchema.Profile) -> ())
 	end
 end
 
--- The client's read-only view of its own profile.
-function Data.snapshot(player: Player)
-	local data = entries[player].data
+-- The client's read-only view of a profile. An explicit allowlist: nothing
+-- from the private campaign or learning state (learningV2, campaign) is
+-- ever included; the only learning-derived field is the visible title.
+-- Pure apart from catalogs, so tests can check it (tests/Privacy.spec).
+function Data.view(data: ProfileSchema.Profile, extras: { blocked: { [string]: string }, cooldowns: any, persistent: boolean })
 	local pet = ProfileSchema.activePet(data)
-	local blocked = {}
-	for npcId, state in data.npcs do
-		if state.blocked then
-			local def = S.NPC.getDefinition(npcId)
-			blocked[npcId] = def and def.displayName or npcId
-		end
-	end
 	local activities = {}
 	for id, a in data.activities do
 		activities[id] = { count = a.count, best = a.best }
@@ -312,15 +307,34 @@ function Data.snapshot(player: Player)
 	return {
 		coins = data.wallet.paw_coins or 0,
 		pet = petView,
-		cooldowns = S.Interaction.cooldowns(player),
+		cooldowns = extras.cooldowns,
 		inventory = table.clone(data.inventory),
 		playerEquipped = table.clone(data.playerEquipped),
 		quests = table.clone(data.quests),
 		activities = activities,
 		unlocks = table.clone(data.unlocks),
-		blocked = blocked,
-		persistent = entries[player].persistent,
+		blocked = extras.blocked,
+		persistent = extras.persistent,
+		visibleTitle = data.visibleTitle,
+		showRibbon = data.show and data.show.ribbon == true or nil,
 	}
+end
+
+-- The client's read-only view of its own profile.
+function Data.snapshot(player: Player)
+	local data = entries[player].data
+	local blocked = {}
+	for npcId, state in data.npcs do
+		if state.blocked then
+			local def = S.NPC.getDefinition(npcId)
+			blocked[npcId] = def and def.displayName or npcId
+		end
+	end
+	return Data.view(data, {
+		blocked = blocked,
+		cooldowns = S.Interaction.cooldowns(player),
+		persistent = entries[player].persistent,
+	})
 end
 
 -- Coalesces many changes in one frame into one state push.
