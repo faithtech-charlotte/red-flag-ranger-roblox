@@ -43,7 +43,7 @@ New: `Content/Campaign/{Facts,Shared,Onboarding,Sparkz,Healthy,Cara,Lee,Roleplay
 ## Studio checklist (plan Phase 2 "Verify in Studio")
 
 1. Onboarding: adopt. Lee's radio welcome within ~2 s, then Cara's intro with the practice-tools tip first. Free to move within ~30 s. Closing the welcome early on a fresh save makes the first invitation start with "This is a practice story…".
-2. E1: finish an activity, wait ≤5 s: "Sparkz_Pup is waving at you. (Story character)" with Talk / Later / Skip. Talk. Sparkz at about (−100, −62) with a dog of your breed, visible only to you. Pal card accept/decline; Leave earns nothing. Then "Cara waves." card.
+2. E1: finish an activity, wait ≤5 s: "Sparkz_Pup is waving at you. (Story character)" with Talk / Later / Skip. Talk. Sparkz at about (−114, −70) with a dog of your breed, visible only to you. Pal card accept/decline; Leave earns nothing. Then "Cara waves." card.
 3. green_riley: one more activity + 90 s play. Try "Not right now", then "Something feels off" → reflect → Back.
 4. E2 safe exit: Leave at "What school do you go to?" → full Respond credit, Cara's follow-up, Sparkz hidden after.
 5. Mistake then recovery: [Share my school] → Cara's pause card → Try again → safe choices → "Thanks for trying that again".
@@ -107,7 +107,17 @@ Run A (after merging main, 275/275 tests):
 | 21 | Pass: in Ranger HQ with the journal open, Lee waits; opens when the journal closes |
 | Trail + jump obstacles | Pass: all 10 markers, no stuck legs, 2 steady squirrels, 3 stars |
 
-Not run yet (each needs a fresh E2, so a new Play): 5, 6, 7 (live), 8, 16, 18, 20. 10 is not observable on the client (covered by tests).
+Run C:
+
+| # | Result |
+|---|---|
+| 6 | Part: HUD 💙 Help during E2 closes the scene; "Talk to Ranger Lee" opens Lee's E2 menu (school only) |
+| 18 | Pass: after HUD Help and finishing with Lee, no "Cara waves." in the next 76 s |
+| Bug | Fixed: Sparkz could not be talked to by walking up. The squeaky duck's E prompt (7.5 studs away) always won the key. Sparkz moved to (-114, -70); not yet re-checked |
+
+Not run yet: 5, 6 (Help after walking away), 7 (live), 8, 16, 20. 10 is not observable on the client (covered by tests).
+
+Also seen: the Help popup's close button shows an empty square (missing glyph). 10 is not observable on the client (covered by tests).
 
 Also seen: Riley's invitation card has no "Story character" label (Sparkz's and Cara's do); Riley's skip line says "practice it with Cara anytime" though Riley's beat is a healthy one.
 

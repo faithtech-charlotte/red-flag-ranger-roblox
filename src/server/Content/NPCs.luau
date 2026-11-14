@@ -139,7 +139,9 @@ return {
 		companionDog = true,
 		appearance = { skin = rgb(240, 200, 160), shirt = rgb(120, 200, 120), pants = rgb(70, 80, 120), hair = rgb(150, 100, 50) },
 		placements = {
-			{ locationId = "dog_park", position = Vector3.new(-100, 0, -62), faces = Vector3.new(-90, 0, -40) },
+			-- Kept 12+ studs from the park props: a nearer E prompt (the squeaky
+			-- duck) would take the key and Sparkz could not be talked to.
+			{ locationId = "dog_park", position = Vector3.new(-114, 0, -70), faces = Vector3.new(-90, 0, -40) },
 		},
 		encounters = { "park_e1_hello", "park_e2_deal" },
 		idleLine = "Hey!", -- PROVISIONAL: needs script line
