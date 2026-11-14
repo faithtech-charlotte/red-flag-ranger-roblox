@@ -223,8 +223,10 @@ return function(t)
 							error(`{where}: a benign scene earned evidence`)
 						end
 					elseif atRecovery then
-						-- Leaving the recovery card = "Keep playing": no Respond.
-						if cats.respond ~= 0 then
+						-- Leaving the recovery card = "Keep playing": the exit adds
+						-- no Respond beyond what earlier choices already earned.
+						local before = L.categories(ledgerAfter(w.events), ScoreRules).respond
+						if cats.respond ~= before then
 							error(`{where}: leaving from recovery earned Respond`)
 						end
 					elseif w.story.concern then
