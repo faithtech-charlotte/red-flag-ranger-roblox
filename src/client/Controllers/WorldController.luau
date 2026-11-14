@@ -208,17 +208,43 @@ local function updateActivityUI()
 	end
 end
 
+-- A dog this close to you is following you, so it wraps with you. Matches
+-- PetService's TELEPORT_DISTANCE: farther than that, the server re-homes it.
+local PET_CARRY_DISTANCE = 45
+
+local function ownPet(): Model?
+	for _, model in CollectionService:GetTagged("Pet") do
+		if model:IsA("Model") and model:GetAttribute("OwnerUserId") == player.UserId then
+			return model
+		end
+	end
+	return nil
+end
+
 -- The client owns its character's physics, so wrapping here is instant and
 -- smooth. Rotation and velocity are kept so running carries straight through.
+-- The client also owns its dog's physics, so the dog is moved by the same jump;
+-- otherwise its AlignPosition would drag it ~500 studs across the map.
 local function wrapCharacter()
 	local character = player.Character
 	local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if not hrp then
+	if not character or not hrp then
 		return
 	end
-	local wrapped = WorldBounds.wrap(hrp.Position)
-	if wrapped then
-		character:PivotTo(CFrame.new(wrapped) * hrp.CFrame.Rotation)
+	local from = hrp.Position
+	local wrapped = WorldBounds.wrap(from)
+	if not wrapped then
+		return
+	end
+	character:PivotTo(CFrame.new(wrapped) * hrp.CFrame.Rotation)
+
+	local pet = ownPet()
+	if pet then
+		local pivot = pet:GetPivot()
+		-- A dog off fetching a ball stays put; it isn't following you.
+		if (pivot.Position - from).Magnitude <= PET_CARRY_DISTANCE then
+			pet:PivotTo(pivot + (wrapped - from))
+		end
 	end
 end
 
