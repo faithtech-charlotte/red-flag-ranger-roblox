@@ -179,6 +179,7 @@ local function renderHelp()
 end
 
 -- Hide the HUD's buttons and objective during hands-on play (petting).
+-- The Help button is never in this list.
 local focusFrames: { GuiObject } = {}
 function HUD.setFocus(on: boolean)
 	for _, f in focusFrames do
@@ -302,19 +303,22 @@ function HUD.start(screenGui: ScreenGui, ctl)
 		controllers.ActionBar.toggle()
 	end)
 	petButton.Parent = side
-	sideButton("📜 Missions", C.green, 2, function()
+	local missionsButton = sideButton("📜 Missions", C.green, 2, function()
 		controllers.Missions.open()
-	end).Parent = side
-	sideButton("👕 Wardrobe", C.purple, 3, function()
+	end)
+	missionsButton.Parent = side
+	local wardrobeButton = sideButton("👕 Wardrobe", C.purple, 3, function()
 		controllers.Shop.open("wardrobe")
-	end).Parent = side
+	end)
+	wardrobeButton.Parent = side
 	sideButton("💙 Help", C.help, 4, function()
 		controllers.ActionBar.close()
 		helpPanel.Visible = not helpPanel.Visible
 		renderHelp()
 	end).Parent = side
 
-	focusFrames = { objective :: GuiObject, side :: GuiObject }
+	-- Help stays out of this list: it must never be hidden, even while petting.
+	focusFrames = { objective :: GuiObject, petButton :: GuiObject, missionsButton :: GuiObject, wardrobeButton :: GuiObject }
 	State.changed:Connect(renderObjective)
 	if State.data then
 		renderObjective()

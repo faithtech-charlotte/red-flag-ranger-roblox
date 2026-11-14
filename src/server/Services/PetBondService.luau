@@ -55,6 +55,13 @@ function Bond.has(player: Player, kind: string, id: string): boolean
 	return BondCatalog.isUnlocked(Bond.level(player), kind, id)
 end
 
+-- True while `sourceId` would give 0 XP because of its per-source cooldown.
+function Bond.coolingDown(player: Player, sourceId: string): boolean
+	local source = BondCatalog.Sources[sourceId]
+	local last = lastAt[player] and lastAt[player][sourceId]
+	return source ~= nil and last ~= nil and os.clock() - last < source.cooldown
+end
+
 --[[
 	Awards Bond XP from a named source. `amount` may override the source's
 	base XP (e.g. a fancier treat); it is server-defined, never from a client.

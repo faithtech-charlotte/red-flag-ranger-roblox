@@ -47,11 +47,6 @@ local function petModel(player: Player): Model?
 	return S.Pet.getModel(player)
 end
 
-local function petName(player: Player): string
-	local model = petModel(player)
-	return model and model:GetAttribute("PetName") or "Your dog"
-end
-
 local function setPetAttr(player: Player, name: string, value: any)
 	local model = petModel(player)
 	if model then
@@ -207,7 +202,7 @@ function Fetch.throw(player: Player, aim: any, power: any): (boolean, string?)
 		return false, nil
 	end
 	if Fetch.isBusy(player) then
-		return false, `{petName(player)} is still on it!`
+		return false, `{S.Pet.name(player)} is still on it!`
 	end
 	if Activity.current(player) then
 		return false, "Finish what you're doing first!"
@@ -321,7 +316,7 @@ function Fetch.throw(player: Player, aim: any, power: any): (boolean, string?)
 				S.Pet.settle(player)
 				streaks[player] = 0
 				done(player, session, true)
-				S.Net.push(player, Remotes.PushKinds.Fetch, { ready = true, lost = true, text = `Oops! {petName(player)} can't reach that one. Here's another ball!` })
+				S.Net.push(player, Remotes.PushKinds.Fetch, { ready = true, lost = true, text = `Oops! {S.Pet.name(player)} can't reach that one. Here's another ball!` })
 				return
 			end
 		end

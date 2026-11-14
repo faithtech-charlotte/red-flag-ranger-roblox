@@ -26,11 +26,6 @@ local SLACK = 0.05 -- extra zone width to forgive tiny timing differences
 local Training = {}
 local S, Activity
 
-local function petName(player: Player): string
-	local model = S.Pet.getModel(player)
-	return model and model:GetAttribute("PetName") or "your dog"
-end
-
 local function movesFor(player: Player): { { id: string, label: string } }
 	local moves = { { id = "sit", label = "Sit" } }
 	local level = S.Bond.level(player)
@@ -89,7 +84,7 @@ local function finishSession(player: Player, session)
 		Activity.complete(player, "trick_training")
 	else
 		S.Pet.settle(player)
-		S.Net.toast(player, `So close! {petName(player)} wants to try again.`, "info")
+		S.Net.toast(player, `So close! {S.Pet.name(player)} wants to try again.`, "info")
 	end
 end
 
