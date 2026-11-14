@@ -17,6 +17,10 @@ local Net = {}
 local S
 local handlers: { [string]: { fn: Handler, interval: number, needsProfile: boolean } } = {}
 local lastCall: { [Player]: { [string]: number } } = {}
+-- Request kinds that don't mean the player did something (state polling,
+-- automatic panel renewal).
+local PASSIVE = { getState = true, panelState = true }
+local lastActed: { [Player]: number } = {}
 local push: RemoteEvent
 
 function Net.init(services)
@@ -41,6 +45,9 @@ function Net.init(services)
 			return { ok = false, error = "slow down", throttled = true }
 		end
 		calls[kind] = now
+		if not PASSIVE[kind] then
+			lastActed[player] = now
+		end
 		if entry.needsProfile and not S.Data.get(player) then
 			return { ok = false, error = "Still loading, one sec!" }
 		end
@@ -53,6 +60,7 @@ function Net.init(services)
 	end
 	Players.PlayerRemoving:Connect(function(player)
 		lastCall[player] = nil
+		lastActed[player] = nil
 	end)
 end
 
@@ -60,6 +68,11 @@ end
 function Net.on(kind: string, fn: Handler, interval: number?, needsProfile: boolean?)
 	assert(handlers[kind] == nil, `Net handler {kind} registered twice`)
 	handlers[kind] = { fn = fn, interval = interval or 0.2, needsProfile = needsProfile ~= false }
+end
+
+-- os.clock() of the player's last real request, or nil.
+function Net.lastActedAt(player: Player): number?
+	return lastActed[player]
 end
 
 function Net.push(player: Player, kind: string, payload: any?)

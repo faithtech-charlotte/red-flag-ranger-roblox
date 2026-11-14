@@ -41,6 +41,7 @@ type Session = {
 	nodeId: string?,
 	feedback: { text: string, outcome: string, complete: boolean }?,
 	rev: number, -- bumped on every node sent; requests must echo it
+	exited: boolean?, -- the exit event was already published (safety tool)
 	facts: { [string]: boolean }, -- facts presented so far in this session
 }
 
@@ -141,12 +142,15 @@ end
 --   completed   the graph reached an outcome (outcome given)
 --   walk_away   the player closed the panel or walked out of range
 --   help        Help preempted it
---   blocked / reported   a practice safety tool, after its feedback card
+--   blocked / reported   a practice safety tool (published when the tool is
+--               used, before its feedback card)
 --   replaced    another conversation started
 --   respawn / disconnect
 -- The exit event carries the facts this session presented, so listeners
 -- (story progress) can tell "left before anything concerning" from "left
 -- after a concerning request" without guessing.
+local publishExit: (Player, Session, string, string?) -> ()
+
 local function endSession(player: Player, kind: string?, outcome: string?)
 	local session = sessions[player]
 	if not session then
@@ -156,7 +160,15 @@ local function endSession(player: Player, kind: string?, outcome: string?)
 	if player.Parent then
 		S.Net.push(player, Remotes.PushKinds.DialogueClose)
 	end
-	if session.enc then
+	if session.enc and not session.exited then
+		publishExit(player, session, kind or "walk_away", outcome)
+	end
+end
+
+-- Exactly one exit event per session.
+publishExit = function(player: Player, session: Session, kind: string, outcome: string?)
+	session.exited = true
+	do
 		local facts = {}
 		for fact in session.facts do
 			table.insert(facts, fact)
@@ -166,16 +178,16 @@ local function endSession(player: Player, kind: string?, outcome: string?)
 			npcId = session.npcId,
 			arcId = session.arcId,
 			nodeId = session.nodeId,
-			kind = kind or "walk_away",
+			kind = kind,
 			outcome = outcome,
 			facts = facts,
 		})
 	end
 end
 
-local function finish(player: Player, outcome: string)
+local function finish(player: Player, outcome: string, kind: string?)
 	local session = sessions[player]
-	endSession(player, "completed", outcome)
+	endSession(player, kind or "completed", outcome)
 	if not session or not session.enc then
 		return
 	end
@@ -365,7 +377,7 @@ local function close(player: Player, payload: any): (boolean, string?)
 		local first = node.choices[1]
 		return choose(player, { sessionId = session.id, rev = session.rev, choiceId = first.id })
 	end
-	if enc.onWalkAway and session.nodeId ~= enc.onWalkAway then
+	if enc.onWalkAway and session.nodeId ~= enc.onWalkAway and payload.force ~= true then
 		session.nodeId = enc.onWalkAway
 		send(player)
 		return true
@@ -386,7 +398,7 @@ local function safety(player: Player, payload: any): (boolean, string?)
 
 	if tool == "help" then
 		if completes then
-			finish(player, "sought_help")
+			finish(player, "sought_help", "help") -- a safe exit, not a plain completion
 		end
 		Encounter.startHelp(player) -- ends any remaining scene with kind "help"
 		return true
@@ -396,14 +408,16 @@ local function safety(player: Player, payload: any): (boolean, string?)
 	end
 	local action = tool == "block" and "simulate_block" or "simulate_report"
 	ActionService.run(player, { { action = action, npcId = session.npcId } }, { npcId = session.npcId })
-	-- Published before the feedback card shows, so the choice is recorded
-	-- even if the player disconnects while reading it.
+	-- The exit is committed before the feedback card shows, so the choice
+	-- (and any evidence) is recorded even if the player disconnects or
+	-- respawns while reading it. The later close publishes nothing more.
 	if enc then
 		EventBus.publish("encounter.safety_tool", player, {
 			encounterId = enc.id,
 			npcId = session.npcId,
 			tool = tool,
 		})
+		publishExit(player, session, tool == "block" and "blocked" or "reported", nil)
 	end
 	session.feedback = {
 		text = EncounterEngine.format(Content.safetyFeedback[tool], vars(player, npcDef)),
@@ -511,14 +525,24 @@ function Encounter.start()
 		return true
 	end, 0.5)
 
+	-- Leaving while a completing feedback card is open still completes the
+	-- encounter (its exit was already published by the safety tool).
+	local function settle(player: Player, kind: string)
+		local session = sessions[player]
+		if session and session.feedback and session.feedback.complete then
+			finish(player, session.feedback.outcome, kind)
+		else
+			endSession(player, kind)
+		end
+	end
 	Players.PlayerRemoving:Connect(function(player)
-		endSession(player, "disconnect")
+		settle(player, "disconnect")
 	end)
 	local function watchRespawn(player: Player)
 		player.CharacterAdded:Connect(function()
 			local session = sessions[player]
 			if session and not session.remote then
-				endSession(player, "respawn")
+				settle(player, "respawn")
 			end
 		end)
 	end

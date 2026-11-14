@@ -35,7 +35,8 @@ type Entry = {
 	readOnly: boolean,
 	pushQueued: boolean,
 	saving: boolean?, -- a write is in flight
-	saveQueued: boolean?, -- a checkpoint save is scheduled
+	saveQueued: boolean?, -- a checkpoint writer loop is running
+	dirty: boolean?, -- changed since the last write started
 	lastSaved: number?, -- os.clock() of the last write attempt
 	removed: boolean?, -- player left; final release in progress
 }
@@ -113,6 +114,8 @@ local function saveProfile(player: Player, release: boolean): SaveResult
 		return "skipped"
 	end
 	entry.saving = true
+	entry.dirty = false -- changes made from here on need another write
+	entry.lastSaved = os.clock()
 	local lost, written = false, false
 	local ok, err = pcall(function()
 		(store :: DataStore):UpdateAsync(keyFor(player), function(old)
@@ -172,8 +175,7 @@ local function onPlayerAdded(player: Player)
 	if player.Parent == nil then
 		-- Left while loading: release the lock we just took.
 		entries[player] = { data = profile :: any, persistent = persistent, readOnly = readOnly, pushQueued = false }
-		saveProfile(player, true)
-		entries[player] = nil
+		releaseProfile(player) -- same retried release as a normal leave
 		return
 	end
 	local data = profile :: ProfileSchema.Profile
@@ -247,16 +249,30 @@ end
 -- CHECKPOINT_SECONDS per player. Never wait on it before showing feedback.
 function Data.checkpoint(player: Player, _reason: string?)
 	local entry = entries[player]
-	if not entry or entry.removed or entry.saveQueued or not entry.persistent or entry.readOnly then
+	if not entry or entry.removed or not entry.persistent or entry.readOnly then
 		return
 	end
+	if entry.saveQueued then
+		entry.dirty = true -- the running writer loop will pick it up
+		return
+	end
+	entry.dirty = true
 	entry.saveQueued = true
-	local since = os.clock() - (entry.lastSaved or 0)
-	task.delay(math.max(0, CHECKPOINT_SECONDS - since), function()
-		entry.saveQueued = false
-		if entries[player] == entry and not entry.removed then
-			saveProfile(player, false)
+	-- One writer loop per player: it waits out the spacing (measured from
+	-- the start of the last write, whoever made it), lets an in-flight write
+	-- finish, and writes again only if something changed meanwhile.
+	task.spawn(function()
+		while entries[player] == entry and not entry.removed and entry.persistent and entry.dirty do
+			local wait = CHECKPOINT_SECONDS - (os.clock() - (entry.lastSaved or 0))
+			if wait > 0 then
+				task.wait(wait)
+			elseif entry.saving then
+				task.wait(0.2)
+			else
+				saveProfile(player, false)
+			end
 		end
+		entry.saveQueued = false
 	end)
 end
 

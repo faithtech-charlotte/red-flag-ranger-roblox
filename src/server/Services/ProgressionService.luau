@@ -34,17 +34,12 @@ local Content = require(script.Parent.Parent.Content)
 local ScoreRules = require(script.Parent.Parent.Content.ScoreRules)
 local EncounterScheduler = require(script.Parent.Parent.Logic.EncounterScheduler)
 local LearningProgress = require(script.Parent.Parent.Logic.LearningProgress)
+local Rules = require(script.Parent.Parent.Logic.ProgressionRules)
 
 local INVITATIONS_ENABLED = false
 local TICK_SECONDS = 5
 local IDLE_SECONDS = 30 -- active play = moved or busy within this window
 local MOVE_EPSILON = 1
-
--- Exits that are a safe choice by the player (leave, ask for help, use a
--- practice tool). After a concerning request these earn full Respond.
-local SAFE_EXITS = { walk_away = true, help = true, blocked = true, reported = true }
--- Exits that just interrupt; the beat goes back to eligible.
-local INTERRUPTIONS = { replaced = true, respawn = true, disconnect = true }
 
 local Progression = {}
 local S
@@ -124,9 +119,8 @@ local function onFacts(player: Player, info)
 	if not beat then
 		return
 	end
-	Progression.record(player, { kind = "beat_encountered", beat = beat, viaRoleplay = viaRoleplay })
-	for _, fact in info.facts do
-		Progression.record(player, { kind = "fact_seen", beat = beat, fact = fact })
+	for _, event in Rules.factEvents(beat, viaRoleplay, info.facts) do
+		Progression.record(player, event)
 	end
 end
 
@@ -135,27 +129,12 @@ local function onExit(player: Player, info)
 	if not beat then
 		return
 	end
-	if SAFE_EXITS[info.kind] then
-		local concerning = false
-		for _, fact in info.facts do
-			if isConcerning(fact) then
-				concerning = true
-				break
-			end
-		end
-		-- Leaving right after a concerning request earns both Respond slots;
-		-- a benign or premature leave earns nothing and costs nothing.
-		if concerning then
-			Progression.record(player, { kind = "left_after_request", beat = beat })
-		end
+	local ledgerEvents, schedulerEvents = Rules.exitEvents(info, beat, viaRoleplay, isConcerning)
+	for _, event in ledgerEvents do
+		Progression.record(player, event)
 	end
-	if viaRoleplay then
-		return -- practice roleplays never move the live campaign
-	end
-	if INTERRUPTIONS[info.kind] then
-		Progression.schedule(player, { type = "interrupted", beat = beat })
-	else
-		Progression.schedule(player, { type = "resolved", beat = beat })
+	for _, event in schedulerEvents do
+		Progression.schedule(player, event)
 	end
 end
 
@@ -170,13 +149,16 @@ local function tick()
 			local pos = hrp.Position
 			local moved = lastPos[player] == nil or (pos - lastPos[player]).Magnitude > MOVE_EPSILON
 			lastPos[player] = pos
-			if moved or S.InteractionState.busy(player) then
+			-- Real play only: moving, or a request the player actually made.
+			-- An open panel alone (auto-renewed) does not count.
+			local acted = S.Net.lastActedAt(player)
+			if moved or (acted and now - acted <= IDLE_SECONDS) then
 				lastActive[player] = now
 			end
 			if lastActive[player] and now - lastActive[player] <= IDLE_SECONDS then
 				local campaign = profile.campaign
 				if campaign.remainingGap and campaign.remainingGap > 0 then
-					Progression.schedule(player, { type = "active_seconds", seconds = TICK_SECONDS })
+					Progression.schedule(player, Rules.activeSeconds(TICK_SECONDS))
 				end
 			end
 			if INVITATIONS_ENABLED then
@@ -220,13 +202,13 @@ function Progression.start()
 		profile.campaign = EncounterScheduler.sanitize(profile.campaign)
 	end)
 	EventBus.subscribe("activity.completed", function(player)
-		Progression.schedule(player, { type = "activity_completed" })
+		Progression.schedule(player, Rules.ACTIVITY_COMPLETED)
 	end)
 	EventBus.subscribe("encounter.facts_presented", onFacts)
 	EventBus.subscribe("encounter.exited", onExit)
 	EventBus.subscribe("encounter.safety_tool", function(player, info)
 		if info.tool == "block" then
-			Progression.schedule(player, { type = "blocked", npc = info.npcId })
+			Progression.schedule(player, Rules.blocked(info.npcId))
 		end
 	end)
 	task.spawn(function()

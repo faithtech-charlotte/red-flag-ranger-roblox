@@ -125,6 +125,11 @@ local function prerequisitesMet(state, beat: string): boolean
 end
 
 local function finish(state, beat: string, status: string)
+	-- The pacing gap runs from when a scene ends (or its invitation is
+	-- dismissed), not from when it was offered (owner default).
+	if state.current == beat then
+		state.remainingGap = EncounterScheduler.MIN_GAP_SECONDS
+	end
 	state.beats[beat] = status
 	state.resolvedAtActivity[beat] = state.completedActivities
 	state.deferredAtActivity[beat] = nil
@@ -227,6 +232,7 @@ handlers.later = function(state, e)
 	state.beats[e.beat] = "deferred"
 	state.deferredAtActivity[e.beat] = state.completedActivities
 	state.current = nil
+	state.remainingGap = EncounterScheduler.MIN_GAP_SECONDS
 end
 
 handlers.skip = function(state, e)

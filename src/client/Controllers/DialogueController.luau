@@ -107,11 +107,14 @@ local function hide()
 	end
 end
 
--- Closes the conversation the way the Walk away button does, so the server
--- records the exit (used when another panel takes over).
+-- Used when another panel takes over: a definitive close. The server ends
+-- the scene as a walk-away (skipping any walk-away note card), and the
+-- panel hides right away instead of waiting for the reply.
 function Dialogue.close()
 	if current then
-		send(Remotes.RequestKinds.DialogueClose, { sessionId = current.sessionId })
+		local payload = { sessionId = current.sessionId, rev = current.rev, force = true }
+		hide()
+		task.spawn(State.request, Remotes.RequestKinds.DialogueClose, payload)
 	end
 end
 
