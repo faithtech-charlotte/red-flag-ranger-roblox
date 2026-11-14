@@ -30,6 +30,7 @@ local controllers = {
 	Activity = require(Controllers.ActivityController),
 	Missions = require(Controllers.MissionsController),
 	World = require(Controllers.WorldController),
+	Whistle = require(Controllers.WhistleController),
 }
 
 controllers.HUD.start(gui, controllers)
@@ -43,3 +44,4 @@ controllers.Ball.start(gui, controllers)
 controllers.Activity.start(gui, controllers)
 controllers.Missions.start(gui, controllers)
 controllers.World.start(gui, controllers)
+controllers.Whistle.start(gui, controllers)
