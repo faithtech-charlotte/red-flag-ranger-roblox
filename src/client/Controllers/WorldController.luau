@@ -272,6 +272,9 @@ function WorldController.start(gui: ScreenGui, controllers)
 				else
 					agilityRun.ring = payload.ring
 				end
+			elseif payload.state == "cancelled" then
+				agilityRun = nil
+				agilityLabel.Visible = false
 			elseif payload.state == "finished" then
 				agilityRun = nil
 				agilityLabel.Text = `Finished in {payload.time}s!`

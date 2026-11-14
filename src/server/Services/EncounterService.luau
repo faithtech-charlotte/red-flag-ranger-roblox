@@ -21,6 +21,7 @@ local ActionService = require(script.Parent.Parent.Core.ActionService)
 local EventBus = require(script.Parent.Parent.Core.EventBus)
 local Content = require(script.Parent.Parent.Content)
 local EncounterEngine = require(script.Parent.Parent.Logic.EncounterEngine)
+local SessionRules = require(script.Parent.Parent.Logic.SessionRules)
 local ProfileSchema = require(script.Parent.Parent.Data.ProfileSchema)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
@@ -70,10 +71,7 @@ local function currentNode(player: Player, session: Session)
 		return {
 			speaker = "tip",
 			text = session.feedback.text,
-			choices = {
-				{ id = "ok", text = "Okay" },
-				{ id = "help", text = "Talk to a trusted adult" },
-			},
+			choices = SessionRules.FEEDBACK_CHOICES,
 		}
 	end
 	if not session.enc then
@@ -234,6 +232,9 @@ local function choose(player: Player, payload: any): (boolean, string?)
 	local choiceId = payload.choiceId
 
 	if session.feedback then
+		if not SessionRules.isFeedbackChoice(choiceId) then
+			return false, "unknown choice"
+		end
 		local fb = session.feedback
 		if fb.complete then
 			finish(player, fb.outcome)
@@ -276,10 +277,13 @@ end
 -- Closing the window. Walking away is always allowed; in encounters with an
 -- onWalkAway node the player sees one short, supportive note first.
 local function close(player: Player, payload: any): (boolean, string?)
+	local current = sessions[player]
+	if not SessionRules.closeTargets(current and current.id, payload) then
+		return true -- stale or unknown close: never touch a newer conversation
+	end
 	local session = validSession(player, payload)
 	if not session then
-		endSession(player)
-		return true
+		return true -- validSession already ended it (walked away)
 	end
 	if session.feedback or not session.enc then
 		return choose(player, { sessionId = session.id, choiceId = "ok" })

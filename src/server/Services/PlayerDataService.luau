@@ -19,6 +19,7 @@ local ProfileSchema = require(script.Parent.Parent.Data.ProfileSchema)
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
 local PetCatalog = require(ReplicatedStorage.Shared.Catalogs.PetCatalog)
 local BondCatalog = require(ReplicatedStorage.Shared.Catalogs.BondCatalog)
+local SessionRules = require(script.Parent.Parent.Logic.SessionRules)
 
 local STORE_NAME = "RFR_PlayerProfiles_v1"
 local SESSION_STALE_SECONDS = 300
@@ -58,11 +59,9 @@ local function loadProfile(player: Player): (ProfileSchema.Profile?, boolean)
 		local result
 		local ok, err = pcall(function()
 			(store :: DataStore):UpdateAsync(keyFor(player), function(old)
-				local session = old and old.session
-				local lockedElsewhere = session
-					and session.jobId ~= game.JobId
-					and os.time() - (session.updated or 0) < SESSION_STALE_SECONDS
-				if lockedElsewhere and attempt < LOAD_ATTEMPTS then
+				-- Never take over a live lock, even on the last attempt: after
+				-- LOAD_ATTEMPTS the player gets a temporary (non-saving) profile.
+				if SessionRules.lockedElsewhere(old and old.session, game.JobId, os.time(), SESSION_STALE_SECONDS) then
 					result = "locked"
 					return nil -- cancel write; retry shortly
 				end
@@ -93,11 +92,12 @@ local function saveProfile(player: Player, release: boolean)
 	if not entry or not entry.persistent or entry.readOnly or not store then
 		return
 	end
+	local lost = false
 	local ok, err = pcall(function()
 		(store :: DataStore):UpdateAsync(keyFor(player), function(old)
-			local session = old and old.session
-			if session and session.jobId ~= game.JobId then
-				return nil -- another server took over; don't clobber its data
+			if not SessionRules.ownsLock(old and old.session, game.JobId) then
+				lost = true
+				return nil -- another server took over (or released); don't clobber its data
 			end
 			return {
 				profile = entry.data,
@@ -107,6 +107,10 @@ local function saveProfile(player: Player, release: boolean)
 	end)
 	if not ok then
 		warn(`[Data] save failed for {player.Name}: {err}`)
+	elseif lost then
+		-- Ownership is gone for good: stop saving this session.
+		entry.persistent = false
+		warn(`[Data] {player.Name}'s save is owned by another server; no longer saving here`)
 	end
 end
 

@@ -236,6 +236,13 @@ function Fetch.throw(player: Player, aim: any, power: any): (boolean, string?)
 		setPetAttr(player, "Carrying", false)
 		setPetAttr(player, "Ready", false)
 		setBallInHand(player, true)
+		-- Don't leave the dog stuck mid-fetch when another activity takes
+		-- over (it would refuse other interactions as "Busy playing!").
+		-- Commands that interrupt set their own state right after this.
+		local state = S.Pet.getState(player)
+		if state == "Fetching" or state == "Returning" then
+			S.Pet.setState(player, "Following")
+		end
 	end)
 	setBallInHand(player, false)
 	local b, hold = makeBall(start, launch(dir, distance), player)

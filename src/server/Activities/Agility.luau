@@ -14,7 +14,11 @@ local Remotes = require(ReplicatedStorage.Shared.Remotes)
 
 local Agility = {}
 local S, Activity
-local runs: { [Player]: { started: number, nextRing: number } } = {}
+-- A run longer than this is abandoned (walked off the course).
+local MAX_RUN_SECONDS = 120
+
+type Run = { started: number, nextRing: number, session: any }
+local runs: { [Player]: Run } = {}
 local hintAt: { [Player]: number } = {}
 
 local function hint(player: Player, text: string)
@@ -60,7 +64,31 @@ local function hook(course: Instance)
 		if run and run.nextRing > 1 and os.clock() - run.started < 60 then
 			return -- mid-run; ignore stepping back on start
 		end
-		runs[player] = { started = os.clock(), nextRing = 1 }
+		if run and Activity.current(player) == run.session then
+			-- Still on (or back at) the start pad: restart the same run.
+			run.started = os.clock()
+			run.nextRing = 1
+		else
+			-- A run is an activity session, so the rest of the game (dog
+			-- commands, story invitations) knows the player is busy.
+			-- Another activity, a dog command, or the timeout interrupts it.
+			local newRun: Run = { started = os.clock(), nextRing = 1, session = nil :: any }
+			newRun.session = Activity.begin(player, "agility", function()
+				if runs[player] == newRun then
+					runs[player] = nil
+				end
+				S.Net.push(player, Remotes.PushKinds.Agility, { state = "cancelled" })
+			end)
+			runs[player] = newRun
+			run = newRun
+		end
+		local active = run :: Run
+		local startedAt = active.started
+		task.delay(MAX_RUN_SECONDS, function()
+			if runs[player] == active and active.started == startedAt then
+				Activity.interrupt(player, "timeout", active.session)
+			end
+		end)
 		local medals = {}
 		for _, m in def.medals do
 			table.insert(medals, { label = m.label, under = m.under })
@@ -94,6 +122,7 @@ local function hook(course: Instance)
 		end
 		local elapsed = os.clock() - run.started
 		runs[player] = nil
+		Activity.finish(player, run.session)
 		if elapsed < def.minSeconds then
 			return
 		end
