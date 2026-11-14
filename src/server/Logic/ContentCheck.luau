@@ -29,6 +29,13 @@ local ContentCheck = {}
 ContentCheck.REVIEW_CARDS = 6
 ContentCheck.BENIGN_SLOTS = 3
 
+-- Generated choice lists the services expand at run time.
+local GENERATED = { facts = true, moments = true, same = true }
+ContentCheck.SCENE_KINDS = {
+	beat = true, healthy = true, onboarding = true, ambient = true, followup = true,
+	roleplay = true, tell = true, walk = true, menu = true,
+}
+
 local function sortedKeys(t: { [any]: any }): { any }
 	local keys = {}
 	for k in t do
@@ -108,6 +115,24 @@ local function checkEncounter(problems, id: string, enc, content, registries)
 			table.insert(roots, enc.onWalkAway)
 		end
 	end
+	-- Campaign scenes: "Something feels off" opens `reflect`; a dynamic
+	-- scene can open at any of its entry nodes.
+	if enc.reflect ~= nil then
+		if typeof(enc.reflect) ~= "string" or nodes[enc.reflect] == nil then
+			table.insert(problems, `{where}: missing reflect node {tostring(enc.reflect)}`)
+		else
+			table.insert(roots, enc.reflect)
+		end
+	end
+	if enc.entryNodes ~= nil then
+		for _, entry in (if typeof(enc.entryNodes) == "table" then enc.entryNodes else {}) do
+			if typeof(entry) ~= "string" or nodes[entry] == nil then
+				table.insert(problems, `{where}: missing entry node {tostring(entry)}`)
+			else
+				table.insert(roots, entry)
+			end
+		end
+	end
 
 	-- Per node / per choice
 	local nodeIds = sortedKeys(nodes)
@@ -138,17 +163,48 @@ local function checkEncounter(problems, id: string, enc, content, registries)
 				end
 				checkActions(problems, cwhere, choice.actions, registries)
 				checkConditions(problems, cwhere, choice.conditions, registries)
+				if choice.generated ~= nil and not GENERATED[choice.generated] then
+					table.insert(problems, `{cwhere}: unknown generated list {tostring(choice.generated)}`)
+				end
+				if choice.back == true and enc.reflect == nil then
+					table.insert(problems, `{cwhere}: back choice in a scene without reflect`)
+				end
+			end
+		end
+		local function checkFacts(list: any, fwhere: string)
+			if typeof(list) ~= "table" then
+				table.insert(problems, `{fwhere}: facts must be a list`)
+				return
+			end
+			for _, fact in list do
+				if typeof(fact) ~= "string" or not knownFacts[fact] then
+					table.insert(problems, `{fwhere}: unknown fact {tostring(fact)}`)
+				end
 			end
 		end
 		if node.facts ~= nil then
-			if typeof(node.facts) ~= "table" then
-				table.insert(problems, `{nwhere}: facts must be a list`)
+			checkFacts(node.facts, nwhere)
+		end
+		if node.addText ~= nil then
+			if typeof(node.addText) ~= "table" then
+				table.insert(problems, `{nwhere}: addText must be a list`)
 			else
-				for _, fact in node.facts do
-					if typeof(fact) ~= "string" or not knownFacts[fact] then
-						table.insert(problems, `{nwhere}: unknown fact {tostring(fact)}`)
+				for i, extra in node.addText do
+					local awhere = `{nwhere}.addText#{i}`
+					if typeof(extra) ~= "table" or typeof(extra.text) ~= "string" or #extra.text == 0 then
+						table.insert(problems, `{awhere}: missing text`)
+					else
+						checkConditions(problems, awhere, extra.conditions, registries)
+						if extra.facts ~= nil then
+							checkFacts(extra.facts, awhere)
+						end
 					end
 				end
+			end
+		end
+		if node.variants ~= nil then
+			if typeof(node.variants) ~= "table" or (node.variantBy ~= "outcome" and node.variantBy ~= "aboutOutcome") then
+				table.insert(problems, `{nwhere}: variants need a table and variantBy outcome/aboutOutcome`)
 			end
 		end
 	end
@@ -201,6 +257,138 @@ local function checkEncounter(problems, id: string, enc, content, registries)
 		local node = nodes[nodeId]
 		if not canEnd[nodeId] and typeof(node) == "table" and typeof(node.choices) == "table" and #node.choices > 0 then
 			table.insert(problems, `{where}.{tostring(nodeId)}: no path to an ending (branch never terminates)`)
+		end
+	end
+
+	if enc.campaign == true then
+		ContentCheck.checkMetadata(problems, id, enc, content)
+	end
+end
+
+local function nonEmptyList(v: any): boolean
+	return typeof(v) == "table" and #v > 0
+end
+
+local function isList(v: any): boolean
+	return typeof(v) == "table"
+end
+
+--[[
+	Campaign scenes carry full metadata (plan Phase 2): stable id, content
+	version, NPC, prerequisites, facts, outcomes, safe exits, recovery,
+	review status, skill mapping. The declared facts and outcomes must match
+	what the nodes actually present and end with, and every presented fact
+	must belong to the scene's own beat.
+]]
+function ContentCheck.checkMetadata(problems, id: string, enc, content)
+	local where = `encounter {id}`
+	local nodes = enc.nodes
+	if enc.id ~= id then
+		table.insert(problems, `{where}: id mismatch`)
+	end
+	if typeof(enc.contentVersion) ~= "number" then
+		table.insert(problems, `{where}: missing contentVersion`)
+	end
+	if typeof(enc.reviewStatus) ~= "string" or #enc.reviewStatus == 0 then
+		table.insert(problems, `{where}: missing reviewStatus`)
+	end
+	if typeof(enc.npcId) ~= "string" or (typeof(content.npcs) == "table" and content.npcs[enc.npcId] == nil) then
+		table.insert(problems, `{where}: unknown npc {tostring(enc.npcId)}`)
+	end
+	if not ContentCheck.SCENE_KINDS[enc.sceneKind] then
+		table.insert(problems, `{where}: unknown sceneKind {tostring(enc.sceneKind)}`)
+	end
+	if enc.repeatable ~= true then
+		table.insert(problems, `{where}: campaign scenes must be repeatable (the scheduler decides)`)
+	end
+	for _, field in { "prerequisites", "facts", "recovery" } do
+		if not isList(enc[field]) then
+			table.insert(problems, `{where}: missing {field} list`)
+		end
+	end
+	for _, field in { "outcomes", "safeExits", "skills" } do
+		if not nonEmptyList(enc[field]) then
+			table.insert(problems, `{where}: missing {field}`)
+		end
+	end
+	local ts = enc.targetSeconds
+	if typeof(ts) ~= "table" or typeof(ts[1]) ~= "number" or typeof(ts[2]) ~= "number" or ts[1] > ts[2] then
+		table.insert(problems, `{where}: targetSeconds must be { min, max }`)
+	end
+	if (enc.sceneKind == "beat" or enc.sceneKind == "healthy" or enc.sceneKind == "ambient")
+		and (typeof(enc.invitation) ~= "table" or typeof(enc.invitation.text) ~= "string")
+	then
+		table.insert(problems, `{where}: unsolicited scenes need invitation text`)
+	end
+	if enc.sceneKind == "roleplay" and typeof(enc.roleplayFor) ~= "string" then
+		table.insert(problems, `{where}: roleplay without roleplayFor`)
+	end
+	if typeof(nodes) ~= "table" then
+		return
+	end
+
+	local ownBeat = enc.roleplayFor or enc.beat
+	local knownFacts = if typeof(content.facts) == "table" then content.facts else {}
+	local presented = {}
+	local outcomesUsed = {}
+	for _, nodeId in sortedKeys(nodes) do
+		local node = nodes[nodeId]
+		if typeof(node) == "table" then
+			local lists = { node.facts }
+			for _, extra in (if typeof(node.addText) == "table" then node.addText else {}) do
+				if typeof(extra) == "table" then
+					table.insert(lists, extra.facts)
+				end
+			end
+			for _, list in lists do
+				for _, fact in (if typeof(list) == "table" then list else {}) do
+					presented[fact] = true
+					local def = knownFacts[fact]
+					if typeof(def) == "table" and def.beat ~= ownBeat then
+						table.insert(problems, `{where}.{tostring(nodeId)}: fact {fact} belongs to {tostring(def.beat)}, not {tostring(ownBeat)}`)
+					end
+				end
+			end
+			for _, choice in (if typeof(node.choices) == "table" then node.choices else {}) do
+				if typeof(choice) == "table" then
+					if choice.next == nil and choice.back ~= true then
+						outcomesUsed[choice.outcome or "done"] = true
+					end
+					if choice.settle ~= nil then
+						outcomesUsed[choice.settle] = true
+					end
+				end
+			end
+			if node.recovery == true and not (isList(enc.recovery) and table.find(enc.recovery, nodeId)) then
+				table.insert(problems, `{where}.{tostring(nodeId)}: recovery node missing from recovery list`)
+			end
+		end
+	end
+	local declaredFacts = {}
+	for _, fact in (if isList(enc.facts) then enc.facts else {}) do
+		declaredFacts[fact] = true
+		if not presented[fact] then
+			table.insert(problems, `{where}: declares fact {tostring(fact)} that no node presents`)
+		end
+	end
+	for _, fact in sortedKeys(presented) do
+		if not declaredFacts[fact] then
+			table.insert(problems, `{where}: presents undeclared fact {tostring(fact)}`)
+		end
+	end
+	for _, nodeId in (if isList(enc.recovery) then enc.recovery else {}) do
+		local node = nodes[nodeId]
+		if typeof(node) ~= "table" or node.recovery ~= true then
+			table.insert(problems, `{where}: recovery {tostring(nodeId)} is not a recovery node`)
+		end
+	end
+	local declaredOutcomes = {}
+	for _, o in (if isList(enc.outcomes) then enc.outcomes else {}) do
+		declaredOutcomes[o] = true
+	end
+	for _, o in sortedKeys(outcomesUsed) do
+		if not declaredOutcomes[o] then
+			table.insert(problems, `{where}: ends with undeclared outcome {tostring(o)}`)
 		end
 	end
 end

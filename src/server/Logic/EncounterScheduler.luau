@@ -298,7 +298,10 @@ local function nonEmpty(v: any): boolean
 	return typeof(v) == "string" and #v > 0
 end
 
--- ctx = { busy, help, replay?, recovery?, recoveryRequested?, ambient? }
+-- ctx = { busy, help, replay?, recovery?, recoveryRequested?, ambient?, available? }
+-- available (optional) = { [beat] = true }: only beats that have a scene
+-- may be invited (content arrives phase by phase). A beat without one is
+-- passed over, so it never blocks an ambient scene either.
 function EncounterScheduler.decide(state, ctx)
 	ctx = if typeof(ctx) == "table" then ctx else {}
 	local busy = ctx.busy == true
@@ -321,8 +324,9 @@ function EncounterScheduler.decide(state, ctx)
 	if busy or state.remainingGap > 0 or state.current ~= nil then
 		return nil
 	end
+	local available = if typeof(ctx.available) == "table" then ctx.available else nil
 	for _, beat in EncounterScheduler.BEATS do
-		if EncounterScheduler.status(state, beat) == "eligible" then
+		if EncounterScheduler.status(state, beat) == "eligible" and (available == nil or available[beat] == true) then
 			return { kind = "campaign", beat = beat }
 		end
 	end

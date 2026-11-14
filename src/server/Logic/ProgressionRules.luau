@@ -24,9 +24,14 @@ end
 
 -- A scene exit -> (ledgerEvents, schedulerEvents).
 -- isConcerning(factId) says whether a fact is a concerning request.
+-- Respawn, disconnect and a replaced scene still end the conversation
+-- right after the request, so they credit like Leave (campaign-script
+-- 1.3). The beat itself only goes back to eligible.
 function ProgressionRules.exitEvents(info, beat: string, viaRoleplay: boolean, isConcerning: (string) -> boolean): ({ any }, { any })
 	local ledger, scheduler = {}, {}
-	if ProgressionRules.SAFE_EXITS[info.kind] then
+	-- Leaving from the recovery card after a simulated agreement is "Keep
+	-- playing" (campaign-script 4.6): no Respond credit from the exit.
+	if (ProgressionRules.SAFE_EXITS[info.kind] or ProgressionRules.INTERRUPTIONS[info.kind]) and info.atRecovery ~= true then
 		for _, fact in info.facts or {} do
 			if isConcerning(fact) then
 				table.insert(ledger, { kind = "left_after_request", beat = beat })

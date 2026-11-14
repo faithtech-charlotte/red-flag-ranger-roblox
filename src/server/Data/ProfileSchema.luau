@@ -54,6 +54,9 @@ export type Profile = {
 	-- Logic/LearningProgress and Logic/EncounterScheduler on load.
 	learningV2: { [string]: any },
 	campaign: { [string]: any },
+	-- Story flags that only change which text is shown (Logic/StoryRules).
+	-- Private like campaign; added with default fill, no version bump.
+	story: { [string]: any },
 	show: { completed: boolean, ribbon: boolean },
 	visibleTitle: string?, -- the one learning-derived field others may see (owner decision)
 	stats: { sessions: number, firstJoin: number },
@@ -86,6 +89,17 @@ function ProfileSchema.default(now: number?): Profile
 			titles = {},
 		},
 		campaign = { version = 1, onboarded = false, completedActivities = 0, beats = {} },
+		story = {
+			seen = {},
+			palChoice = "none",
+			palRepeat = "none",
+			recoverySeen = false,
+			practiceTipShown = false,
+			disclosed = false,
+			disclosurePending = false,
+			outcomes = {},
+			followUpOffered = {},
+		},
 		show = { completed = false, ribbon = false },
 		stats = { sessions = 0, firstJoin = now or 0 },
 	}
