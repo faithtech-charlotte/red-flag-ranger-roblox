@@ -16,6 +16,22 @@ A Roblox pet adventure (ages 9 to 13) built for the FaithTech hackathon with Pre
 
 **Tests:** the pure logic (encounter engine, purchases, profile migrations, conditions, catalogs) has unit tests in `tests/`. In Studio's command bar: `print(require(game.ServerStorage.Tests)())`
 
+### Optional: Roblox skill for Claude Code
+
+If you use [Claude Code](https://claude.com/claude-code), install the community [roblox-game skill](https://github.com/brockmartin/roblox-game-skill) once per machine. It isn't bundled in this repo because it has no license yet. It installs as a personal skill, so it works in every project:
+
+```bash
+# macOS / Linux / Git Bash
+git clone https://github.com/brockmartin/roblox-game-skill ~/.claude/skills/roblox-game
+```
+
+```powershell
+# Windows PowerShell
+git clone https://github.com/brockmartin/roblox-game-skill "$HOME\.claude\skills\roblox-game"
+```
+
+Restart Claude Code afterward. Check that it loaded by running `/roblox-game` (or `/skills`). To update it, run `git -C ~/.claude/skills/roblox-game pull`. Where its generic advice conflicts with this project, `CLAUDE.md` wins.
+
 ## The 10-minute path
 
 | Step | Where | What happens |
