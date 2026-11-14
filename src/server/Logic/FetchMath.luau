@@ -34,6 +34,30 @@ function FetchMath.clampThrow(origin: Vector3, aim: any, facing: Vector3, minDis
 	return Vector3.new(p.X, origin.Y, p.Z)
 end
 
+--[[
+	Rolling resistance. Roblox contacts have sliding friction but no rolling
+	resistance, so a ball rolling without slipping never slows down on flat
+	ground. We fake it with a capped torque opposing the spin.
+
+	ROLL_DECEL is how fast a rolling ball slows, in studs/s^2: a 30 studs/s
+	roll (a long throw after its bounces) stops in about 15 studs.
+]]
+FetchMath.ROLL_DECEL = 30
+
+-- Torque that slows a solid sphere (I = 2/5 m r^2) rolling without
+-- slipping by `decel`: tau = (I/r + m*r) * a = 1.4 * m * r * a.
+function FetchMath.rollingTorque(mass: number, radius: number, decel: number): number
+	if mass <= 0 or radius <= 0 or decel <= 0 then
+		return 0
+	end
+	return 1.4 * mass * radius * decel
+end
+
+-- How far a ball rolling at `speed` travels before stopping.
+function FetchMath.rollDistance(speed: number, decel: number): number
+	return speed * speed / (2 * decel)
+end
+
 -- Inside the playable square?
 function FetchMath.inBounds(p: Vector3, halfSize: number): boolean
 	return math.abs(p.X) <= halfSize and math.abs(p.Z) <= halfSize
