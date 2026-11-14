@@ -297,7 +297,9 @@ end
 -- from the private campaign or learning state (learningV2, campaign) is
 -- ever included; the only learning-derived field is the visible title.
 -- Pure apart from catalogs, so tests can check it (tests/Privacy.spec).
-function Data.view(data: ProfileSchema.Profile, extras: { blocked: { [string]: string }, cooldowns: any, persistent: boolean })
+-- `present` (story-only NPCs this player can see, npcId -> boolean) is
+-- presence, not progress: it carries no beat, score, fact or answer.
+function Data.view(data: ProfileSchema.Profile, extras: { blocked: { [string]: string }, cooldowns: any, persistent: boolean, present: { [string]: boolean }? })
 	local pet = ProfileSchema.activePet(data)
 	local activities = {}
 	for id, a in data.activities do
@@ -330,6 +332,7 @@ function Data.view(data: ProfileSchema.Profile, extras: { blocked: { [string]: s
 		activities = activities,
 		unlocks = table.clone(data.unlocks),
 		blocked = extras.blocked,
+		present = extras.present,
 		persistent = extras.persistent,
 		visibleTitle = data.visibleTitle,
 		showRibbon = data.show and data.show.ribbon == true or nil,
@@ -350,6 +353,7 @@ function Data.snapshot(player: Player)
 		blocked = blocked,
 		cooldowns = S.Interaction.cooldowns(player),
 		persistent = entries[player].persistent,
+		present = S.Story and S.Story.presence(player) or nil,
 	})
 end
 

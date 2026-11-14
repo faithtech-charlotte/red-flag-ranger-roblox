@@ -21,9 +21,11 @@
 	ledger/scheduler update is idempotent, so a replayed event can't give
 	extra credit. After each change the profile is checkpointed.
 
-	Story invitations stay OFF (INVITATIONS_ENABLED) until Phase 2 adds the
-	campaign content and the invitation card. Nothing here is sent to the
-	client except through PlayerDataService.snapshot's allowlist.
+	Story invitations are ON (Phase 2): each tick, consider() asks the
+	scheduler for at most one invitation (never while the player is busy,
+	only for beats that have a scene) and StoryService shows the card.
+	Nothing here is sent to the client except through
+	PlayerDataService.snapshot's allowlist.
 ]]
 
 local Players = game:GetService("Players")
@@ -36,7 +38,7 @@ local EncounterScheduler = require(script.Parent.Parent.Logic.EncounterScheduler
 local LearningProgress = require(script.Parent.Parent.Logic.LearningProgress)
 local Rules = require(script.Parent.Parent.Logic.ProgressionRules)
 
-local INVITATIONS_ENABLED = false
+local INVITATIONS_ENABLED = true
 local TICK_SECONDS = 5
 local IDLE_SECONDS = 30 -- active play = moved or busy within this window
 local MOVE_EPSILON = 1
@@ -93,6 +95,9 @@ function Progression.schedule(player: Player, event): boolean
 	end
 	profile.campaign = after
 	S.Data.checkpoint(player, "campaign")
+	if not same(before.beats, after.beats) then
+		S.Data.pushState(player) -- story presence (who's in the park) may change
+	end
 	return true
 end
 
@@ -172,14 +177,25 @@ local function tick()
 	end
 end
 
--- Asks the scheduler whether to invite now. Phase 2 sends the card.
+-- Asks the scheduler whether to invite now, and shows the card if so.
+-- Help, replay and recovery are player-started elsewhere; only campaign
+-- beats (that have a scene) and ambient scenes are invited here.
 function Progression.consider(player: Player)
 	local profile = S.Data.get(player)
-	if not profile then
+	if not profile or not profile.campaign.onboarded then
 		return nil
 	end
-	local busy = S.InteractionState.busy(player)
-	return EncounterScheduler.decide(profile.campaign, { busy = busy, help = false })
+	local busy = S.InteractionState.busy(player) or S.Story.busy(player)
+	local decision = EncounterScheduler.decide(profile.campaign, {
+		busy = busy,
+		help = false,
+		available = S.Story.available,
+		ambient = S.Story.ambient(player),
+	})
+	if decision and (decision.kind == "campaign" or decision.kind == "ambient") then
+		S.Story.invite(player, decision)
+	end
+	return decision
 end
 
 function Progression.init(services)
@@ -214,6 +230,10 @@ function Progression.start()
 		if info.tool == "block" then
 			Progression.schedule(player, Rules.blocked(info.npcId))
 		end
+	end)
+	EventBus.subscribe("encounter.unblocked", function(player, info)
+		-- No reset, no restart: blocked beats stay skipped_by_block.
+		Progression.schedule(player, { kind = "unblocked", npc = info.npcId })
 	end)
 	task.spawn(function()
 		while true do
