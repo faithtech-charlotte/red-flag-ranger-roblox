@@ -25,13 +25,6 @@ The project uses Rojo's tree mapping (`default.project.json`) to map source file
 | `src/shared/` | `ReplicatedStorage.Shared` | Client & Server |
 | `src/server/` | `ServerScriptService.Server` | Server only |
 | `src/client/` | `StarterPlayer.StarterPlayerScripts.Client` | Client only |
-| `tests/` | `ServerStorage.Tests` | Unit tests for pure logic: `print(require(game.ServerStorage.Tests)())` |
-
-See README.md for the game architecture. Key rules:
-- The world, NPCs, dogs and UI are all built in code at runtime (`WorldBuilder`, `DogRig`, `NPCService`, client controllers). There are no binary assets.
-- Server services expose `init(services)` then `start()`; they reach each other through the shared `services` table (see `src/server/init.server.luau`).
-- Dialogue and story content is data in `src/server/Content/`. All educational text is provisional pending Present Age review.
-- Clients send ids only; every outcome is decided and validated on the server.
 
 **Entry Points:**
 - `src/server/init.server.luau` - Server-side entry point (runs on game servers)
