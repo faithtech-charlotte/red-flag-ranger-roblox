@@ -69,6 +69,7 @@ type Story = {
 	agreed: boolean, -- picked a simulated agreement
 	outcome: string?, -- settled outcome (roleplay debrief)
 	returnTo: string?, -- node "Something feels off" was pressed on
+	reflectAnswered: boolean?, -- one reflection answer per scene
 	narrator: string?, -- "ranger_lee" when Lee runs a roleplay
 	visited: { [string]: boolean },
 }
@@ -235,7 +236,7 @@ local function barOf(session: Session, kind: string): { string }
 		recovery = node ~= nil and node.recovery == true,
 		pretend = node ~= nil and node.pretend == true,
 		inReflect = (story ~= nil and story.returnTo ~= nil) or (node ~= nil and node.speaker == "tip"),
-		hasReflect = enc ~= nil and enc.reflect ~= nil,
+		hasReflect = enc ~= nil and enc.reflect ~= nil and not (story ~= nil and story.reflectAnswered == true),
 	})
 end
 
@@ -684,6 +685,15 @@ function Encounter.offer(player: Player, card: Card): boolean
 	return true
 end
 
+-- Closes an open invitation or follow-up card (not a scene) because play
+-- started; it counts as interrupted, so the pacing gap applies.
+function Encounter.dismissCard(player: Player)
+	local session = sessions[player]
+	if session and session.kind == "card" then
+		endSession(player, "forced")
+	end
+end
+
 -- Opens help from anywhere. Never gated. Help preempts whatever is open;
 -- that scene ends with exit kind "help" (owner decision: a safe exit,
 -- Sparkz never resumes that pressure). After a concerning request Lee
@@ -699,6 +709,10 @@ function Encounter.startHelp(player: Player)
 	end
 	recentConcern[player] = nil
 	endSession(player, "help")
+	if S.Story then
+		-- The player is with Lee now: no Cara card or walk afterwards.
+		S.Story.onHelp(player)
+	end
 	local profile = profileOf(player)
 	if profile then
 		profile.learning.toolsPracticed.help = true
@@ -931,6 +945,11 @@ local function choose(player: Player, payload: any): (boolean, string?)
 		endNow = false,
 		openScene = nil,
 	}
+	if story and story.returnTo ~= nil and session.nodeId == session.enc.reflect and not choice.back then
+		-- One reflection answer per scene; later chances are Cara's look-back
+		-- or a roleplay (campaign script note 8).
+		story.reflectAnswered = true
+	end
 	ActionService.run(player, choice.actions, actx)
 	if story then
 		if choice.refused then
@@ -940,7 +959,8 @@ local function choose(player: Player, payload: any): (boolean, string?)
 			story.agreed = true
 		end
 		if choice.settle then
-			story.outcome = choice.settle
+			-- Recovery-aware: a safe ending after an agreement is a retry.
+			story.outcome = StoryRules.exitOutcome(story, "completed", choice.settle)
 		end
 	end
 
@@ -1035,7 +1055,17 @@ local function close(player: Player, payload: any): (boolean, string?)
 end
 
 local function safety(player: Player, payload: any): (boolean, string?)
-	local session = validSession(player, payload)
+	local current = sessions[player]
+	if typeof(payload) == "table" and payload.tool == "help" then
+		-- Help is never refused: not for distance and not for a stale rev.
+		-- Only a request for some other (older) conversation is ignored.
+		if not current or payload.sessionId ~= current.id then
+			return false, nil
+		end
+	end
+	local session = if typeof(payload) == "table" and payload.tool == "help"
+		then current
+		else validSession(player, payload)
 	if not session then
 		return false, nil
 	end
@@ -1064,7 +1094,7 @@ local function safety(player: Player, payload: any): (boolean, string?)
 
 	if tool == "off" then
 		-- "Something feels off": the scene's reflection, then back.
-		if not story or not enc.reflect then
+		if not story or not enc.reflect or story.reflectAnswered then
 			return false, "Not available here."
 		end
 		story.returnTo = session.nodeId

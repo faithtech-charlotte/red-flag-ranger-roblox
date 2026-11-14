@@ -272,6 +272,13 @@ local function onboard(player: Player, profile)
 	end
 end
 
+-- Help opened Lee directly (from a scene, the HUD, or anywhere): a queued
+-- Cara follow-up or a walk to Lee is no longer wanted.
+function Story.onHelp(player: Player)
+	pendingFollowUp[player] = nil
+	walks[player] = nil
+end
+
 local function stepWalk(player: Player)
 	local walk = walks[player]
 	if not walk then
@@ -283,7 +290,7 @@ local function stepWalk(player: Player)
 	end
 	local character = player.Character
 	local hrp = character and character:FindFirstChild("HumanoidRootPart") :: BasePart?
-	if hrp and Places.isInside("ranger_station", hrp.Position) and not S.Encounter.isActive(player) then
+	if hrp and Places.isInside("ranger_station", hrp.Position) and not S.InteractionState.busy(player) then
 		walks[player] = nil
 		S.Encounter.startTell(player, "ctx", walk.beat, true)
 	end

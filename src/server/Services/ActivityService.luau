@@ -105,6 +105,10 @@ end
 -- Starts a session, interrupting any other one first.
 function Activity.begin(player: Player, id: string, onInterrupt: ((string) -> ())?): Session
 	Activity.interrupt(player, "replaced")
+	if S.Encounter and S.Encounter.dismissCard then
+		-- A story card never sits over play: starting an activity puts it off.
+		S.Encounter.dismissCard(player)
+	end
 	local session = { id = id, startedAt = os.clock(), data = {}, onInterrupt = onInterrupt }
 	sessions[player] = session
 	mirror(player)
