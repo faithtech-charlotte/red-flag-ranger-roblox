@@ -62,7 +62,7 @@ See README.md for the game architecture. Key rules:
 
 ## Controls (current)
 
-- **Whistle:** H / gamepad D-pad Up / the 📣 button (above the jump button on touch) calls the dog back from anywhere (`WhistleController`).
+- **Whistle:** H / gamepad D-pad Up / the 📣 button (above the jump button on touch) calls the dog back from anywhere (`WhistleController`). During an activity the first press (whistle or Sit/Stay/Come) shows a "Stop <activity>? Press again" confirm (client-side, from the player's `ActivityName` attribute that `ActivityService` sets); the server is unchanged.
 - **Action bar** (bottom-left, `ActionBarController`): Q / gamepad Y. Planned to be replaced by a tap-the-dog ring menu.
 - Planned: the dog becomes solid to players and obstacles, sidesteps when walked into, and jumps agility hurdles.
 
